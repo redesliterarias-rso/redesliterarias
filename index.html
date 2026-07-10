@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desafio Redes Literárias</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons for UI elements -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .hidden { display: none !important; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .bg-primary { background-color: #003b49; }
+        .text-primary { color: #003b49; }
+        .border-primary { border-color: #003b49; }
+        .bg-secondary { background-color: #f8b417; }
+        .text-secondary { color: #f8b417; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen">
+
+    <!-- VIEW: LOGIN -->
+    <div id="view-login" class="min-h-screen flex flex-col items-center justify-center p-4 bg-secondary fade-in">
+        <div class="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
+            <div class="p-6 bg-primary text-white flex flex-col items-center">
+                <img src="Redes literárias_Biblioteca (1).png" alt="Logo" class="w-32 h-32 object-contain bg-white rounded-full p-2 mb-4 shadow-md" onerror="this.src='https://placehold.co/150x150/ffffff/003b49?text=RL'">
+                <h1 class="text-2xl font-bold text-center">Desafio Redes Literárias</h1>
+            </div>
+            
+            <div class="flex border-b">
+                <button id="tab-login-user" class="flex-1 py-3 font-semibold text-primary border-b-2 border-primary transition">Leitor</button>
+                <button id="tab-login-admin" class="flex-1 py-3 font-semibold text-gray-400 transition">Administração</button>
+            </div>
+
+            <div class="p-6 relative">
+                <!-- User Login Form -->
+                <form id="form-login-user" class="space-y-4">
+                    <div id="login-error-msg" class="hidden mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center"></div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nº de Registro ou CPF</label>
+                        <input type="text" id="login-identifier" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-secondary outline-none" placeholder="Ex: RSO-123456 ou 000.000.000-00" required>
+                    </div>
+                    <button type="submit" class="w-full bg-primary text-white py-3 rounded-lg font-semibold hover:bg-opacity-90 transition">Entrar</button>
+                    <div class="text-center pt-4 border-t mt-4">
+                        <p class="text-sm text-gray-600 mb-2">Ainda não participa do desafio?</p>
+                        <button type="button" onclick="switchView('view-register')" class="w-full bg-secondary text-primary py-3 rounded-lg font-semibold hover:opacity-90 transition">Fazer Cadastro</button>
+                    </div>
+                </form>
+
+                <!-- Admin Login Form -->
+                <form id="form-login-admin" class="space-y-4 hidden">
+                    <div id="admin-error-msg" class="hidden mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center"></div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">E-mail Administrativo</label>
+                        <input type="email" id="login-admin-email" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary outline-none" placeholder="admin@biblioteca.com" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                        <input type="password" id="login-admin-pwd" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary outline-none" required>
+                    </div>
+                    <button type="submit" class="w-full bg-primary text-white py-3 rounded-lg font-semibold hover:bg-opacity-90 transition">Acessar Painel</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- VIEW: REGISTER -->
+    <div id="view-register" class="hidden min-h-screen bg-gray-100 p-4 py-8 fade-in">
+        <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg p-6 md:p-8">
+            <button onclick="switchView('view-login')" class="text-primary mb-6 flex items-center font-medium hover:underline">
+                <i class="ph ph-caret-left mr-1"></i> Voltar
+            </button>
+            
+            <h2 class="text-2xl font-bold text-primary mb-6 border-b pb-2">Cadastro de Leitor</h2>
+            
+            <div id="reg-error-msg" class="hidden mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-start">
+                <i class="ph ph-warning-circle text-xl mr-2"></i>
+                <p id="reg-error-text"></p>
+            </div>
+
+            <form id="form-register" class="space-y-6">
+                <!-- Selfie -->
+                <div class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
+                    <div id="selfie-preview-container" class="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 overflow-hidden border-4 border-white shadow">
+                        <i id="selfie-icon" class="ph ph-camera text-4xl"></i>
+                        <img id="selfie-img" src="" crossorigin="anonymous" class="hidden w-full h-full object-cover">
+                    </div>
+                    <label class="mt-4 cursor-pointer bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-opacity-90 transition">
+                        Tirar Foto / Anexar
+                        <input type="file" id="reg-foto" accept="image/*" class="hidden" required>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-2">Usada na sua carteirinha virtual</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
+                        <input type="text" id="reg-nome" class="w-full p-3 border rounded-lg focus:ring-primary outline-none" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
+                        <input type="date" id="reg-nasc" class="w-full p-3 border rounded-lg focus:ring-primary outline-none" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">RG ou CPF</label>
+                        <input type="text" id="reg-doc" class="w-full p-3 border rounded-lg focus:ring-primary outline-none" required>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Endereço Completo</label>
+                        <input type="text" id="reg-end" class="w-full p-3 border rounded-lg focus:ring-primary outline-none" required>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Telefone / WhatsApp</label>
+                        <input type="text" id="reg-tel" class="w-full p-3 border rounded-lg focus:ring-primary outline-none" required>
+                    </div>
+                </div>
+
+                <!-- Responsável (Menores) -->
+                <div id="resp-section" class="hidden p-4 bg-yellow-50 border border-yellow-200 rounded-xl space-y-4">
+                    <h3 class="font-semibold text-yellow-800 flex items-center">
+                        <i class="ph ph-warning text-lg mr-2"></i>
+                        Dados do Responsável (Menor de 18 anos)
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nome do Responsável</label>
+                            <input type="text" id="reg-resp-nome" class="w-full p-3 border rounded-lg bg-white outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">CPF do Responsável</label>
+                            <input type="text" id="reg-resp-doc" class="w-full p-3 border rounded-lg bg-white outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Contato</label>
+                            <input type="text" id="reg-resp-tel" class="w-full p-3 border rounded-lg bg-white outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" id="btn-submit-reg" class="w-full py-4 rounded-xl font-bold text-lg text-white bg-secondary text-primary hover:opacity-90 transition">
+                    Concluir Cadastro
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- VIEW: USER DASHBOARD -->
+    <div id="view-user" class="hidden min-h-screen bg-gray-100 pb-10 fade-in">
+        <header class="bg-primary text-white p-4 shadow-md">
+            <div class="max-w-5xl mx-auto flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <img src="Redes literárias_Biblioteca (1).png" alt="Logo" class="w-10 h-10 bg-white rounded-full p-1" onerror="this.src='https://placehold.co/50x50/ffffff/003b49?text=RL'">
+                    <div>
+                        <h1 class="font-bold text-sm md:text-lg leading-tight">Redes Literárias</h1>
+                        <p class="text-secondary text-xs">Área do Leitor</p>
+                    </div>
+                </div>
+                <button onclick="logout()" class="flex items-center text-sm text-gray-300 hover:text-white transition">
+                    <i class="ph ph-sign-out mr-1 text-lg"></i> Sair
+                </button>
+            </div>
+        </header>
+
+        <main class="max-w-5xl mx-auto mt-6 px-4">
+            <!-- Prize Banner -->
+            <div class="bg-gradient-to-r from-red-600 to-red-800 rounded-2xl p-4 mb-6 shadow-lg flex flex-col md:flex-row items-center justify-between text-white">
+                <div class="mb-4 md:mb-0 flex-1">
+                    <h3 class="font-bold text-xl mb-1 flex items-center"><i class="ph-fill ph-trophy mr-2 text-yellow-300 text-2xl"></i> Grande Prêmio</h3>
+                    <p class="text-red-100 text-sm">O vencedor ganha uma bolsa de inglês integral na WizOn!</p>
+                </div>
+                <div class="bg-white p-2 rounded-lg flex gap-2 items-center">
+                    <img src="WIZARD_Logo_Vermelho_Azul_CMYK.png" alt="Wizard by Pearson" class="h-8 object-contain" onerror="this.style.display='none'">
+                    <img src="WIZARD ON_Logo_Azul_Vermelho_CMYK.png" alt="WizOn" class="h-8 object-contain" onerror="this.style.display='none'">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <!-- Sidebar: ID Card & Check-in -->
+                <div class="lg:col-span-1 space-y-6">
+                    
+                    <!-- CARTEIRINHA VISUAL -->
+                    <div id="id-card-element" class="bg-white rounded-2xl shadow-md overflow-hidden relative border border-gray-200" style="width: 320px; max-width: 100%; margin: 0 auto; background-color: white;">
+                        <div style="background-color: #f8b417; height: 80px; width: 100%; border-bottom-left-radius: 40px; border-bottom-right-radius: 40px;"></div>
+                        <div class="p-6 flex flex-col items-center" style="margin-top: -50px;">
+                            <img id="user-profile-img" src="" crossorigin="anonymous" alt="User" class="w-24 h-24 rounded-full border-4 border-white shadow-md object-cover bg-gray-100" style="z-index: 10;">
+                            <h2 id="user-profile-name" class="mt-3 font-bold text-lg text-center text-primary leading-tight">Nome</h2>
+                            <div class="bg-gray-100 text-primary px-3 py-1 rounded-full text-xs font-bold mt-2 border border-gray-200">
+                                Registro: <span id="user-profile-reg">---</span>
+                            </div>
+                            
+                            <div class="w-full mt-4">
+                                <div class="flex justify-between items-center p-2 bg-blue-50 rounded-lg border border-blue-100">
+                                    <span class="text-xs text-gray-600 flex items-center font-semibold">Desafio Redes Literárias</span>
+                                    <span class="text-xs font-bold text-primary">Leitor</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Canvas Oculto para Renderização do Download -->
+                    <canvas id="id-card-canvas" class="hidden"></canvas>
+                    
+                    <button onclick="downloadNativeCanvas()" class="w-full bg-primary text-white py-2 rounded-xl text-sm font-semibold hover:bg-opacity-90 transition flex justify-center items-center">
+                        <i class="ph ph-download-simple mr-2"></i> Baixar Carteirinha
+                    </button>
+
+                    <!-- Check-in System -->
+                    <div class="bg-white rounded-2xl shadow-md p-5 border border-gray-200">
+                        <h3 class="font-bold text-primary mb-3 text-sm flex items-center border-b pb-2">
+                            <i class="ph ph-map-pin mr-2 text-secondary text-lg"></i> Presença na Biblioteca
+                        </h3>
+                        <div id="checkin-status" class="mb-4 text-center">
+                            <span class="inline-block px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">Ausente</span>
+                        </div>
+                        <div id="checkin-info" class="hidden mb-4 text-xs text-gray-600 bg-blue-50 p-3 rounded-lg">
+                            <p class="font-bold text-primary mb-1">Entrada:</p>
+                            <p id="checkin-time" class="mb-1">--:--</p>
+                            <p id="checkin-coords" class="truncate opacity-70">Lat: -- Lon: --</p>
+                        </div>
+                        <button id="btn-checkin" onclick="handleCheckIn()" class="w-full bg-green-600 text-white py-2 rounded-xl text-sm font-bold hover:bg-green-700 transition">Fazer Check-in</button>
+                        <button id="btn-checkout" onclick="handleCheckOut()" class="hidden w-full bg-red-600 text-white py-2 rounded-xl text-sm font-bold hover:bg-red-700 transition">Fazer Check-out</button>
+                        <p id="geo-error" class="text-xs text-red-500 mt-2 text-center hidden"></p>
+                    </div>
+                </div>
+
+                <!-- Main Actions Area -->
+                <div class="lg:col-span-3 space-y-6">
+                    <div class="bg-white rounded-2xl shadow-md p-2 flex gap-2 overflow-x-auto">
+                        <button onclick="switchUserTab('tab-historic')" id="btn-tab-historic" class="flex-1 py-2 px-4 rounded-xl font-medium text-sm transition bg-primary text-white whitespace-nowrap">Histórico Geral</button>
+                        <button onclick="switchUserTab('tab-book')" id="btn-tab-book" class="flex-1 py-2 px-4 rounded-xl font-medium text-sm transition text-gray-500 hover:bg-gray-100 whitespace-nowrap">Meus Livros</button>
+                        <button onclick="switchUserTab('tab-summary')" id="btn-tab-summary" class="flex-1 py-2 px-4 rounded-xl font-medium text-sm transition text-gray-500 hover:bg-gray-100 whitespace-nowrap">Agendar Resumo</button>
+                    </div>
+
+                    <div id="user-msg-box" class="hidden p-4 rounded-xl text-sm font-medium transition-all"></div>
+
+                    <!-- Tab: Historic -->
+                    <div id="tab-historic" class="bg-white rounded-2xl shadow-md p-6">
+                        <div class="flex justify-between items-center mb-4 border-b pb-2">
+                            <h3 class="font-bold text-primary">Suas Atividades</h3>
+                            <span class="font-bold text-lg text-primary bg-yellow-100 px-3 py-1 rounded-lg">Total: <span id="user-total-pts">0</span> pts</span>
+                        </div>
+                        <div id="user-activities-list" class="space-y-3">
+                            <!-- Activities injected here -->
+                        </div>
+                    </div>
+
+                    <!-- Tab: Book Management -->
+                    <div id="tab-book" class="hidden bg-white rounded-2xl shadow-md p-6">
+                        <h3 class="font-bold text-primary mb-2">Lista de Leituras</h3>
+                        <p class="text-sm text-gray-500 mb-6">Cadastre novos livros e atualize o status da sua leitura.</p>
+                        
+                        <!-- Add Book Form -->
+                        <form id="form-add-book" class="flex flex-col md:flex-row gap-2 mb-6">
+                            <input type="text" id="book-title" class="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-secondary outline-none text-sm" placeholder="Ex: O Pequeno Príncipe" required>
+                            <button type="submit" class="bg-secondary text-primary font-bold py-3 px-6 rounded-xl hover:opacity-90 transition text-sm whitespace-nowrap">Adicionar (+10 pts)</button>
+                        </form>
+
+                        <!-- Books List -->
+                        <div class="overflow-x-auto border rounded-xl">
+                            <table class="w-full text-left border-collapse">
+                                <thead class="bg-gray-50 border-b">
+                                    <tr>
+                                        <th class="p-3 text-xs font-semibold text-gray-600">Título da Obra</th>
+                                        <th class="p-3 text-xs font-semibold text-gray-600 hidden md:table-cell">Data Registro</th>
+                                        <th class="p-3 text-xs font-semibold text-gray-600 text-center">Status</th>
+                                        <th class="p-3 text-xs font-semibold text-gray-600 text-right">Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="user-books-list" class="text-sm">
+                                    <!-- Books injected here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Summary -->
+                    <div id="tab-summary" class="hidden bg-white rounded-2xl shadow-md p-6">
+                        <h3 class="font-bold text-primary mb-2">Agendar Resumo Presencial</h3>
+                        <div class="bg-blue-50 p-4 rounded-xl mb-6 text-sm text-blue-800 flex items-start">
+                            <i class="ph-fill ph-info text-xl mr-2 mt-0.5"></i>
+                            <p>O resumo é feito na biblioteca, sem consulta. Atendimento de <strong>Terça a Quinta</strong>, das <strong>09h às 18h</strong>. (Vale 50 pts)</p>
+                        </div>
+                        <form id="form-schedule">
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Livro Relacionado</label>
+                                <select id="sched-book-id" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-secondary outline-none bg-white" required>
+                                    <!-- Options injected -->
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Data</label>
+                                    <input type="date" id="sched-date" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-secondary outline-none" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Horário</label>
+                                    <input type="time" id="sched-time" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-secondary outline-none" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full bg-primary text-white font-bold py-3 rounded-xl hover:opacity-90 transition mt-6">Confirmar Agendamento</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- VIEW: ADMIN DASHBOARD -->
+    <div id="view-admin" class="hidden min-h-screen bg-gray-50 pb-10 fade-in">
+        <header class="bg-gray-900 text-white p-4 shadow-md">
+            <div class="max-w-6xl mx-auto flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-gray-900 font-bold">AD</div>
+                    <div>
+                        <h1 class="font-bold text-lg leading-tight">Painel Administrativo</h1>
+                        <p class="text-gray-400 text-sm">Redes Literárias</p>
+                    </div>
+                </div>
+                <button onclick="logout()" class="flex items-center text-sm text-gray-400 hover:text-white transition">
+                    <i class="ph ph-sign-out mr-1 text-lg"></i> Sair
+                </button>
+            </div>
+        </header>
+
+        <main class="max-w-6xl mx-auto mt-6 px-4">
+            <div class="flex flex-wrap bg-white rounded-xl shadow-sm mb-6 overflow-hidden border border-gray-200">
+                <button onclick="switchAdminTab('admin-leituras')" id="btn-admin-leituras" class="flex-1 py-3 px-2 md:px-4 font-semibold text-xs md:text-sm bg-primary text-white transition whitespace-nowrap">Gestão de Leituras</button>
+                <button onclick="switchAdminTab('admin-atividades')" id="btn-admin-atividades" class="flex-1 py-3 px-2 md:px-4 font-semibold text-xs md:text-sm border-l text-gray-600 hover:bg-gray-50 transition whitespace-nowrap">Atividades e Resumos</button>
+                <button onclick="switchAdminTab('admin-infracoes')" id="btn-admin-infracoes" class="flex-1 py-3 px-2 md:px-4 font-semibold text-xs md:text-sm border-l text-gray-600 hover:bg-gray-50 transition whitespace-nowrap">Infrações</button>
+                <button onclick="switchAdminTab('admin-ranking')" id="btn-admin-ranking" class="flex-1 py-3 px-2 md:px-4 font-semibold text-xs md:text-sm border-l text-gray-600 hover:bg-gray-50 transition whitespace-nowrap">Ranking</button>
+                <button onclick="switchAdminTab('admin-export')" id="btn-admin-export" class="flex-1 py-3 px-2 md:px-4 font-semibold text-xs md:text-sm border-l text-gray-600 hover:bg-gray-50 transition whitespace-nowrap">Exportar Dados</button>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-md p-6 border border-gray-200">
+                <div id="admin-msg-box" class="hidden mb-6 p-4 rounded-xl text-sm font-medium"></div>
+
+                <!-- Admin Tab: Gestão de Leituras -->
+                <div id="admin-leituras">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold text-gray-800">Leituras dos Participantes</h2>
+                    </div>
+                    <div class="overflow-x-auto border rounded-xl">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-gray-50 border-b">
+                                <tr>
+                                    <th class="p-3 text-xs font-semibold text-gray-600">Leitor</th>
+                                    <th class="p-3 text-xs font-semibold text-gray-600">Livro</th>
+                                    <th class="p-3 text-xs font-semibold text-gray-600 text-center">Status</th>
+                                    <th class="p-3 text-xs font-semibold text-gray-600 text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-books-body" class="text-sm">
+                                <!-- Admin Books injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Admin Tab: Atividades Globais (Edit everything) -->
+                <div id="admin-atividades" class="hidden">
+                    <h2 class="text-xl font-bold text-gray-800 mb-2">Gestão de Atividades</h2>
+                    <p class="text-sm text-gray-500 mb-6">Valide resumos pendentes ou edite pontos, datas e status de qualquer atividade do sistema.</p>
+                    <div id="admin-activities-list" class="space-y-4">
+                        <!-- All Activities injected here -->
+                    </div>
+                </div>
+
+                <!-- Admin Tab: Infrações -->
+                <div id="admin-infracoes" class="hidden">
+                    <h2 class="text-xl font-bold text-gray-800 mb-2">Aplicar Infração</h2>
+                    <p class="text-sm text-gray-500 mb-6">Diminua pontos em caso de mau uso do espaço, trapaça ou danos ao patrimônio.</p>
+                    <form id="form-infraction" class="max-w-lg space-y-4 bg-gray-50 p-6 rounded-xl border border-gray-200">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nº Registro ou CPF do Leitor</label>
+                            <input type="text" id="inf-user" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none" placeholder="Ex: RSO-123456" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Gravidade</label>
+                            <select id="inf-nivel" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none bg-white" required>
+                                <option value="" disabled selected>Selecione a punição</option>
+                                <option value="-10">Infração Leve (-10 pontos)</option>
+                                <option value="-30">Infração Grave (-30 pontos)</option>
+                                <option value="-50">Infração Muito Grave (-50 pontos)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Motivo (Ficará visível no histórico)</label>
+                            <input type="text" id="inf-motivo" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none" placeholder="Ex: Livro rasgado na devolução" required>
+                        </div>
+                        <button type="submit" class="w-full bg-red-600 text-white font-bold py-3 rounded-xl hover:bg-red-700 transition mt-4">Aplicar Punição</button>
+                    </form>
+                </div>
+
+                <!-- Admin Tab: Ranking -->
+                <div id="admin-ranking" class="hidden">
+                    <div class="flex justify-between items-end mb-6">
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-800">Classificação Geral</h2>
+                        </div>
+                        <img src="WIZARD_Logo_Vermelho_Azul_CMYK.png" alt="Wizard" class="h-8 object-contain opacity-80" onerror="this.style.display='none'">
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-gray-50 border-b border-t">
+                                    <th class="p-3 text-sm font-semibold text-gray-600">Pos</th>
+                                    <th class="p-3 text-sm font-semibold text-gray-600">Leitor</th>
+                                    <th class="p-3 text-sm font-semibold text-gray-600 hidden md:table-cell">Registro</th>
+                                    <th class="p-3 text-sm font-semibold text-gray-600 text-right">Pts</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-ranking-body">
+                                <!-- Ranking injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Admin Tab: Exportar -->
+                <div id="admin-export" class="hidden">
+                    <h2 class="text-xl font-bold text-gray-800 mb-6">Exportar Relatórios (Planilhas Excel/CSV)</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-gray-50 p-5 rounded-xl border flex flex-col justify-between">
+                            <div>
+                                <h3 class="font-bold text-primary mb-1 flex items-center"><i class="ph-fill ph-users mr-2"></i> Leitores Cadastrados</h3>
+                                <p class="text-xs text-gray-500 mb-4">Exporta todos os dados de cadastro e data/hora do registro.</p>
+                            </div>
+                            <button onclick="exportCSV('users')" class="bg-primary text-white w-full py-2 rounded-lg text-sm font-bold hover:bg-opacity-90 flex justify-center items-center"><i class="ph ph-download-simple mr-2"></i> Baixar Planilha</button>
+                        </div>
+                        
+                        <div class="bg-gray-50 p-5 rounded-xl border flex flex-col justify-between">
+                            <div>
+                                <h3 class="font-bold text-primary mb-1 flex items-center"><i class="ph-fill ph-books mr-2"></i> Materiais Lidos</h3>
+                                <p class="text-xs text-gray-500 mb-4">Relação completa de todos os livros e o status atual da leitura.</p>
+                            </div>
+                            <button onclick="exportCSV('books')" class="bg-primary text-white w-full py-2 rounded-lg text-sm font-bold hover:bg-opacity-90 flex justify-center items-center"><i class="ph ph-download-simple mr-2"></i> Baixar Planilha</button>
+                        </div>
+
+                        <div class="bg-gray-50 p-5 rounded-xl border flex flex-col justify-between">
+                            <div>
+                                <h3 class="font-bold text-primary mb-1 flex items-center"><i class="ph-fill ph-map-pin mr-2"></i> Check-ins Biblioteca</h3>
+                                <p class="text-xs text-gray-500 mb-4">Relatório de presença física contendo o leitor, data, entrada/saída e coordenadas.</p>
+                            </div>
+                            <button onclick="exportCSV('checkins')" class="bg-primary text-white w-full py-2 rounded-lg text-sm font-bold hover:bg-opacity-90 flex justify-center items-center"><i class="ph ph-download-simple mr-2"></i> Baixar Planilha</button>
+                        </div>
+
+                        <div class="bg-gray-50 p-5 rounded-xl border flex flex-col justify-between">
+                            <div>
+                                <h3 class="font-bold text-primary mb-1 flex items-center"><i class="ph-fill ph-trophy mr-2 text-yellow-500"></i> Ranking Parcial</h3>
+                                <p class="text-xs text-gray-500 mb-4">Classificação geral atualizada com os pontos de cada leitor participante.</p>
+                            </div>
+                            <button onclick="exportCSV('ranking')" class="bg-secondary text-primary w-full py-2 rounded-lg text-sm font-bold hover:opacity-90 flex justify-center items-center"><i class="ph ph-download-simple mr-2"></i> Baixar Ranking</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL: Edit Activity -->
+    <div id="modal-edit-activity" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4 fade-in">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Editar Atividade</h3>
+            <form id="form-edit-activity" class="space-y-4">
+                <input type="hidden" id="edit-act-id">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Título/Descrição</label>
+                    <input type="text" id="edit-act-title" class="w-full p-2 border rounded-lg focus:ring-primary outline-none" required>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Data</label>
+                        <input type="date" id="edit-act-date" class="w-full p-2 border rounded-lg focus:ring-primary outline-none" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Horário (Opcional)</label>
+                        <input type="time" id="edit-act-time" class="w-full p-2 border rounded-lg focus:ring-primary outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Pontos Relacionados (Use . para decimais)</label>
+                    <input type="number" step="0.01" id="edit-act-points" class="w-full p-2 border rounded-lg focus:ring-primary outline-none" required>
+                </div>
+                <div class="flex justify-end gap-2 mt-6 pt-4 border-t">
+                    <button type="button" onclick="closeModal('modal-edit-activity')" class="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 text-white bg-primary rounded-lg font-medium hover:bg-opacity-90">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Edit Book -->
+    <div id="modal-edit-book" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4 fade-in">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Editar Leitura</h3>
+            <form id="form-edit-book" class="space-y-4">
+                <input type="hidden" id="edit-book-id">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Título da Obra</label>
+                    <input type="text" id="edit-book-title" class="w-full p-2 border rounded-lg focus:ring-primary outline-none" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status da Leitura</label>
+                    <select id="edit-book-status" class="w-full p-2 border rounded-lg focus:ring-primary outline-none bg-white" required>
+                        <option value="Lendo">Lendo</option>
+                        <option value="Lido">Lido</option>
+                        <option value="Resumo Entregue">Resumo Entregue</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-2 mt-6 pt-4 border-t">
+                    <button type="button" onclick="closeModal('modal-edit-book')" class="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 text-white bg-primary rounded-lg font-medium hover:bg-opacity-90">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- LOGIC -->
+    <script>
+        // Data Storage
+        let users = JSON.parse(localStorage.getItem('rl_users')) || [];
+        let activities = JSON.parse(localStorage.getItem('rl_activities')) || [];
+        let books = JSON.parse(localStorage.getItem('rl_books')) || [];
+        let currentUser = null;
+
+        function saveData() {
+            localStorage.setItem('rl_users', JSON.stringify(users));
+            localStorage.setItem('rl_activities', JSON.stringify(activities));
+            localStorage.setItem('rl_books', JSON.stringify(books));
+        }
+
+        // Helper: Format Points (Decimals to Brazilian comma)
+        function formatPts(pts) {
+            if (pts === undefined || pts === null) return '0';
+            let p = parseFloat(pts);
+            return Number.isInteger(p) ? p.toString() : p.toFixed(2).replace('.', ',');
+        }
+
+        // --- View Management ---
+        function switchView(viewId) {
+            ['view-login', 'view-register', 'view-user', 'view-admin'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(viewId).classList.remove('hidden');
+        }
+
+        function logout() {
+            currentUser = null;
+            switchView('view-login');
+            document.getElementById('form-login-user').reset();
+            document.getElementById('form-login-admin').reset();
+        }
+
+        function showMessage(elementId, text, isError = false) {
+            const el = document.getElementById(elementId);
+            el.innerHTML = text; 
+            el.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-800');
+            el.classList.add(isError ? 'bg-red-100' : 'bg-green-100');
+            el.classList.add(isError ? 'text-red-700' : 'text-green-800');
+            setTimeout(() => el.classList.add('hidden'), 5000);
+        }
+
+        // --- Login Logic ---
+        document.getElementById('tab-login-user').addEventListener('click', (e) => {
+            e.target.classList.replace('text-gray-400', 'text-primary');
+            e.target.classList.add('border-b-2', 'border-primary');
+            document.getElementById('tab-login-admin').classList.remove('border-b-2', 'border-primary', 'text-primary');
+            document.getElementById('tab-login-admin').classList.add('text-gray-400');
+            document.getElementById('form-login-user').classList.remove('hidden');
+            document.getElementById('form-login-admin').classList.add('hidden');
+        });
+
+        document.getElementById('tab-login-admin').addEventListener('click', (e) => {
+            e.target.classList.replace('text-gray-400', 'text-primary');
+            e.target.classList.add('border-b-2', 'border-primary');
+            document.getElementById('tab-login-user').classList.remove('border-b-2', 'border-primary', 'text-primary');
+            document.getElementById('tab-login-user').classList.add('text-gray-400');
+            document.getElementById('form-login-admin').classList.remove('hidden');
+            document.getElementById('form-login-user').classList.add('hidden');
+        });
+
+        document.getElementById('form-login-user').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = document.getElementById('login-identifier').value.trim();
+            const user = users.find(u => u.registro === id || u.documento === id);
+            if(user) {
+                currentUser = user;
+                loadUserDashboard();
+                switchView('view-user');
+            } else {
+                showMessage('login-error-msg', 'Cadastro não encontrado.', true);
+            }
+        });
+
+        document.getElementById('form-login-admin').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-admin-email').value;
+            const pwd = document.getElementById('login-admin-pwd').value;
+            if(email === 'bibliotecaderemanso@gmail.com' && pwd === 'Rso.redes.2026#') {
+                loadAdminDashboard();
+                switchView('view-admin');
+            } else {
+                showMessage('admin-error-msg', 'Credenciais inválidas.', true);
+            }
+        });
+
+        // --- Register Logic ---
+        document.getElementById('reg-nasc').addEventListener('change', (e) => {
+            const dob = new Date(e.target.value);
+            const today = new Date();
+            let age = today.getFullYear() - dob.getFullYear();
+            const m = today.getMonth() - dob.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+            
+            const btn = document.getElementById('btn-submit-reg');
+            const respSection = document.getElementById('resp-section');
+            const errorDiv = document.getElementById('reg-error-msg');
+            
+            if (age < 11) {
+                errorDiv.classList.remove('hidden');
+                document.getElementById('reg-error-text').textContent = 'Idade mínima de 11 anos não atingida.';
+                btn.disabled = true;
+                btn.classList.replace('bg-secondary', 'bg-gray-400');
+                respSection.classList.add('hidden');
+            } else {
+                errorDiv.classList.add('hidden');
+                btn.disabled = false;
+                btn.classList.replace('bg-gray-400', 'bg-secondary');
+                if (age < 18) {
+                    respSection.classList.remove('hidden');
+                    document.getElementById('reg-resp-nome').required = true;
+                    document.getElementById('reg-resp-doc').required = true;
+                } else {
+                    respSection.classList.add('hidden');
+                    document.getElementById('reg-resp-nome').required = false;
+                    document.getElementById('reg-resp-doc').required = false;
+                }
+            }
+        });
+
+        let currentSelfie = '';
+        document.getElementById('reg-foto').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    currentSelfie = event.target.result;
+                    document.getElementById('selfie-img').src = currentSelfie;
+                    document.getElementById('selfie-img').classList.remove('hidden');
+                    document.getElementById('selfie-icon').classList.add('hidden');
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        document.getElementById('form-register').addEventListener('submit', (e) => {
+            e.preventDefault();
+            if(!currentSelfie) {
+                const err = document.getElementById('reg-error-msg');
+                err.classList.remove('hidden');
+                document.getElementById('reg-error-text').textContent = 'Adicione uma foto para a carteirinha.';
+                return;
+            }
+
+            const now = new Date();
+            const dataCadastroStr = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR');
+
+            const newUser = {
+                id: Date.now().toString(),
+                registro: `RSO-${Math.floor(100000 + Math.random() * 900000)}`,
+                nome: document.getElementById('reg-nome').value,
+                documento: document.getElementById('reg-doc').value,
+                nascimento: document.getElementById('reg-nasc').value,
+                endereco: document.getElementById('reg-end').value,
+                telefone: document.getElementById('reg-tel').value,
+                respNome: document.getElementById('reg-resp-nome').value || '',
+                respDoc: document.getElementById('reg-resp-doc').value || '',
+                respTel: document.getElementById('reg-resp-tel').value || '',
+                dataCadastro: dataCadastroStr,
+                foto: currentSelfie
+            };
+            
+            users.push(newUser);
+            saveData();
+            currentUser = newUser;
+            document.getElementById('form-register').reset();
+            currentSelfie = '';
+            document.getElementById('selfie-img').classList.add('hidden');
+            document.getElementById('selfie-icon').classList.remove('hidden');
+            document.getElementById('resp-section').classList.add('hidden');
+            
+            loadUserDashboard();
+            switchView('view-user');
+        });
+
+        // --- NATIVE CANVAS ID CARD GENERATOR ---
+        function downloadNativeCanvas() {
+            const canvas = document.getElementById('id-card-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = 320;
+            canvas.height = 220;
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#f8b417';
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(320, 0);
+            ctx.lineTo(320, 80);
+            ctx.quadraticCurveTo(320, 100, 280, 100);
+            ctx.lineTo(40, 100);
+            ctx.quadraticCurveTo(0, 100, 0, 80);
+            ctx.fill();
+
+            const img = new Image();
+            img.crossOrigin = "Anonymous";
+            img.onload = function() {
+                const imgSize = 80;
+                const imgX = (canvas.width / 2) - (imgSize / 2);
+                const imgY = 40;
+                
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(imgX + imgSize/2, imgY + imgSize/2, imgSize/2, 0, Math.PI * 2, true);
+                ctx.closePath();
+                ctx.clip();
+                ctx.drawImage(img, imgX, imgY, imgSize, imgSize);
+                
+                ctx.beginPath();
+                ctx.arc(imgX + imgSize/2, imgY + imgSize/2, imgSize/2, 0, Math.PI * 2, true);
+                ctx.clip();
+                ctx.lineWidth = 6;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+                ctx.restore();
+
+                ctx.fillStyle = '#003b49'; 
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 18px Arial';
+                ctx.fillText(currentUser.nome.substring(0, 22), canvas.width/2, 145);
+                
+                ctx.font = '12px Arial';
+                ctx.fillText('Registro: ' + currentUser.registro, canvas.width/2, 165);
+
+                ctx.fillStyle = '#eff6ff'; 
+                ctx.fillRect(20, 180, 280, 30);
+                
+                ctx.fillStyle = '#4b5563';
+                ctx.font = 'bold 11px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText('Desafio Redes Literárias', 30, 200);
+
+                ctx.fillStyle = '#003b49'; 
+                ctx.textAlign = 'right';
+                ctx.fillText('LEITOR', 290, 200);
+
+                const link = document.createElement('a');
+                link.download = `Carteirinha_${currentUser.registro}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            };
+            img.src = currentUser.foto; 
+        }
+
+        // --- User Dashboard Logic ---
+        function switchUserTab(tabId) {
+            ['tab-historic', 'tab-book', 'tab-summary'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            ['btn-tab-historic', 'btn-tab-book', 'btn-tab-summary'].forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.remove('bg-primary', 'text-white');
+                el.classList.add('text-gray-500', 'hover:bg-gray-100');
+            });
+            
+            document.getElementById(tabId).classList.remove('hidden');
+            const btn = document.getElementById(`btn-${tabId}`);
+            btn.classList.add('bg-primary', 'text-white');
+            btn.classList.remove('text-gray-500', 'hover:bg-gray-100');
+        }
+
+        let currentCheckinId = null;
+
+        function loadUserDashboard() {
+            document.getElementById('user-profile-img').src = currentUser.foto;
+            document.getElementById('user-profile-name').textContent = currentUser.nome;
+            document.getElementById('user-profile-reg').textContent = currentUser.registro;
+            
+            updateUserPointsAndActivities();
+            renderBooksList();
+            updateSummaryBookDropdown();
+            checkExistingCheckin();
+        }
+
+        function updateUserPointsAndActivities() {
+            const myActivities = activities.filter(a => a.userId === currentUser.id);
+            const pts = myActivities.reduce((sum, act) => act.status === 'approved' ? sum + act.points : sum, 0);
+            document.getElementById('user-total-pts').textContent = formatPts(pts);
+
+            const list = document.getElementById('user-activities-list');
+            if(myActivities.length === 0) {
+                list.innerHTML = `<p class="text-center text-gray-500 py-4 text-sm">Nenhuma atividade registrada.</p>`;
+            } else {
+                list.innerHTML = myActivities.sort((a,b) => b.id - a.id).map(act => {
+                    let badgeClass = act.status === 'approved' 
+                        ? (act.points < 0 ? 'text-red-600 bg-red-100' : 'text-green-600 bg-green-100')
+                        : 'text-orange-600 bg-orange-100';
+                    let badgeText = act.status === 'approved' 
+                        ? (act.points > 0 ? '+' : '') + formatPts(act.points) + ' pts'
+                        : 'Pendente';
+
+                    return `
+                    <div class="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+                        <div>
+                            <p class="font-medium text-sm text-gray-800">${act.title}</p>
+                            <p class="text-xs text-gray-500">
+                                ${act.type === 'summary' && act.status === 'pending' ? 'Agendado para: ' + act.date.split('-').reverse().join('/') + ' às ' + (act.time || '') : 'Realizado em: ' + act.date.split('-').reverse().join('/')}
+                            </p>
+                        </div>
+                        <div>
+                            <span class="text-xs font-bold px-2 py-1 rounded-full ${badgeClass}">${badgeText}</span>
+                        </div>
+                    </div>
+                `}).join('');
+            }
+        }
+
+        // Check-in / Check-out Logic
+        function checkExistingCheckin() {
+            const activeCheckin = activities.find(a => a.userId === currentUser.id && a.type === 'checkin' && a.status === 'pending');
+            if(activeCheckin) {
+                currentCheckinId = activeCheckin.id;
+                showCheckinState(true, activeCheckin.time, activeCheckin.coords);
+            } else {
+                showCheckinState(false);
+            }
+        }
+
+        function showCheckinState(isCheckedIn, time = '', coords = '') {
+            const statusEl = document.getElementById('checkin-status');
+            const infoEl = document.getElementById('checkin-info');
+            const btnIn = document.getElementById('btn-checkin');
+            const btnOut = document.getElementById('btn-checkout');
+
+            if(isCheckedIn) {
+                statusEl.innerHTML = `<span class="inline-block px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold flex items-center justify-center"><span class="w-2 h-2 rounded-full bg-green-500 mr-1 animate-pulse"></span> Presente</span>`;
+                infoEl.classList.remove('hidden');
+                document.getElementById('checkin-time').textContent = time;
+                document.getElementById('checkin-coords').textContent = coords;
+                btnIn.classList.add('hidden');
+                btnOut.classList.remove('hidden');
+            } else {
+                statusEl.innerHTML = `<span class="inline-block px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">Ausente</span>`;
+                infoEl.classList.add('hidden');
+                btnIn.classList.remove('hidden');
+                btnOut.classList.add('hidden');
+            }
+        }
+
+        function handleCheckIn() {
+            const errEl = document.getElementById('geo-error');
+            errEl.classList.add('hidden');
+            const btnIn = document.getElementById('btn-checkin');
+            btnIn.innerHTML = 'Obtendo Localização...';
+            btnIn.disabled = true;
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude.toFixed(5);
+                        const lon = position.coords.longitude.toFixed(5);
+                        const now = new Date();
+                        const timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        
+                        const newCheckin = {
+                            id: Date.now().toString(),
+                            userId: currentUser.id,
+                            type: 'checkin',
+                            title: 'Presença na Biblioteca',
+                            date: now.toISOString().split('T')[0],
+                            time: timeStr,
+                            coords: `Lat: ${lat}, Lon: ${lon}`,
+                            status: 'pending', 
+                            points: 0 
+                        };
+                        activities.push(newCheckin);
+                        saveData();
+                        currentCheckinId = newCheckin.id;
+                        showCheckinState(true, timeStr, newCheckin.coords);
+                        
+                        btnIn.innerHTML = 'Fazer Check-in';
+                        btnIn.disabled = false;
+                        updateUserPointsAndActivities();
+                    },
+                    (error) => {
+                        btnIn.innerHTML = 'Fazer Check-in';
+                        btnIn.disabled = false;
+                        errEl.textContent = 'Erro ao obter localização. Permita o acesso GPS.';
+                        errEl.classList.remove('hidden');
+                    }
+                );
+            } else {
+                errEl.textContent = 'Geolocalização não suportada.';
+                errEl.classList.remove('hidden');
+                btnIn.innerHTML = 'Fazer Check-in';
+                btnIn.disabled = false;
+            }
+        }
+
+        // Logic to parse time string "HH:MM" to minutes
+        function timeToMins(t) {
+            if(!t) return 0;
+            const [h, m] = t.split(':').map(Number);
+            return h * 60 + m;
+        }
+
+        function handleCheckOut() {
+            if(!currentCheckinId) return;
+            const checkin = activities.find(a => a.id === currentCheckinId);
+            if(checkin) {
+                const now = new Date();
+                const outTimeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                
+                const inMins = timeToMins(checkin.time);
+                const outMins = timeToMins(outTimeStr);
+                let diffMins = outMins - inMins;
+                if (diffMins < 0) diffMins += 24 * 60; // Caso passe da meia-noite
+                
+                let earned = 0;
+                if (diffMins > 120) earned = 3.0;
+                else if (diffMins === 120) earned = 2.0;
+                else if (diffMins >= 60) earned = 1.0;
+                else if (diffMins >= 30) earned = 0.25;
+                else if (diffMins >= 20) earned = 0.10;
+                
+                checkin.status = 'approved'; 
+                checkin.checkoutTime = outTimeStr;
+                checkin.points = earned;
+                checkin.title = `Estadia: ${checkin.time} às ${outTimeStr} (${diffMins} min)`;
+                saveData();
+
+                let msg = earned > 0 
+                    ? `Check-out concluído! Duração: ${diffMins}min. Ganhou +${formatPts(earned)} pontos.`
+                    : `Check-out concluído! Duração inferior a 20min não pontua.`;
+                showMessage('user-msg-box', msg, earned === 0);
+            }
+            currentCheckinId = null;
+            showCheckinState(false);
+            updateUserPointsAndActivities();
+        }
+
+        // Book Logic
+        function renderBooksList() {
+            const myBooks = books.filter(b => b.userId === currentUser.id);
+            const tbody = document.getElementById('user-books-list');
+            
+            if(myBooks.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-500">Nenhum livro registrado.</td></tr>`;
+            } else {
+                tbody.innerHTML = myBooks.sort((a,b) => b.id - a.id).map(b => {
+                    let statusColor = b.status === 'Lendo' ? 'text-blue-600 bg-blue-50' : 
+                                      b.status === 'Lido' ? 'text-green-600 bg-green-50' : 'text-purple-600 bg-purple-50';
+                    return `
+                    <tr class="border-b">
+                        <td class="p-3 font-medium">${b.title}</td>
+                        <td class="p-3 text-gray-500 hidden md:table-cell">${b.dateAdded.split('-').reverse().join('/')}</td>
+                        <td class="p-3 text-center">
+                            <span class="px-2 py-1 rounded text-xs font-bold ${statusColor}">${b.status}</span>
+                        </td>
+                        <td class="p-3 text-right">
+                            ${b.status === 'Lendo' ? `<button onclick="updateBookStatus('${b.id}', 'Lido')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded">Marcar Lido</button>` : ''}
+                        </td>
+                    </tr>
+                `}).join('');
+            }
+        }
+
+        window.updateBookStatus = function(bookId, newStatus) {
+            const b = books.find(x => x.id === bookId);
+            if(b) {
+                b.status = newStatus;
+                saveData();
+                renderBooksList();
+                updateSummaryBookDropdown();
+            }
+        }
+
+        document.getElementById('form-add-book').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const title = document.getElementById('book-title').value;
+            
+            const newBook = {
+                id: Date.now().toString(), userId: currentUser.id, title: title,
+                dateAdded: new Date().toISOString().split('T')[0], status: 'Lendo'
+            };
+            books.push(newBook);
+            
+            activities.push({
+                id: Date.now().toString() + 'act', userId: currentUser.id, type: 'book',
+                title: `Livro: ${title}`, date: newBook.dateAdded, status: 'approved', points: 10
+            });
+            
+            saveData();
+            document.getElementById('book-title').value = '';
+            showMessage('user-msg-box', 'Livro adicionado! +10 pontos.', false);
+            loadUserDashboard();
+        });
+
+        // Summary Scheduling Logic
+        function updateSummaryBookDropdown() {
+            const myBooks = books.filter(b => b.userId === currentUser.id && b.status !== 'Resumo Entregue');
+            const select = document.getElementById('sched-book-id');
+            if(myBooks.length === 0) {
+                select.innerHTML = '<option value="" disabled selected>Nenhum livro disponível para resumo</option>';
+            } else {
+                select.innerHTML = myBooks.map(b => `<option value="${b.id}">${b.title} (${b.status})</option>`).join('');
+            }
+        }
+
+        document.getElementById('form-schedule').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const bookId = document.getElementById('sched-book-id').value;
+            if(!bookId) {
+                showMessage('user-msg-box', 'Selecione um livro antes de agendar.', true);
+                return;
+            }
+
+            const dateVal = document.getElementById('sched-date').value;
+            const timeVal = document.getElementById('sched-time').value;
+            
+            const dateObj = new Date(dateVal);
+            const day = dateObj.getUTCDay();
+            if(day < 2 || day > 4) {
+                showMessage('user-msg-box', 'Agendamentos apenas Terça, Quarta ou Quinta.', true);
+                return;
+            }
+            const hour = parseInt(timeVal.split(':')[0]);
+            if(hour < 9 || hour >= 18) {
+                showMessage('user-msg-box', 'Horário de atendimento das 09h às 18h.', true);
+                return;
+            }
+
+            const book = books.find(b => b.id === bookId);
+
+            activities.push({
+                id: Date.now().toString(), userId: currentUser.id, type: 'summary', bookId: bookId,
+                title: `Resumo: ${book.title}`, date: dateVal, time: timeVal, status: 'pending', points: 50
+            });
+            saveData();
+            document.getElementById('form-schedule').reset();
+            showMessage('user-msg-box', 'Agendamento confirmado!', false);
+            loadUserDashboard();
+            switchUserTab('tab-historic');
+        });
+
+        // --- Admin Dashboard Logic ---
+        function switchAdminTab(tabId) {
+            ['admin-leituras', 'admin-atividades', 'admin-infracoes', 'admin-ranking', 'admin-export'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            ['btn-admin-leituras', 'btn-admin-atividades', 'btn-admin-infracoes', 'btn-admin-ranking', 'btn-admin-export'].forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.remove('bg-primary', 'text-white');
+                el.classList.add('text-gray-600', 'hover:bg-gray-50');
+            });
+            document.getElementById(tabId).classList.remove('hidden');
+            const btn = document.getElementById(`btn-${tabId}`);
+            btn.classList.add('bg-primary', 'text-white');
+            btn.classList.remove('text-gray-600', 'hover:bg-gray-50');
+        }
+
+        function loadAdminDashboard() {
+            // Tab 1: Gestão de Leituras
+            const tbodyBooks = document.getElementById('admin-books-body');
+            if(books.length === 0) {
+                tbodyBooks.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-500">Nenhuma leitura cadastrada no sistema.</td></tr>`;
+            } else {
+                const booksDisplay = books.map(b => {
+                    const u = users.find(user => user.id === b.userId);
+                    return { ...b, userName: u ? u.nome : 'Desconhecido', userReg: u ? u.registro : '' };
+                }).sort((a,b) => b.id - a.id);
+
+                tbodyBooks.innerHTML = booksDisplay.map(b => `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="p-3">
+                            <p class="font-medium text-gray-800">${b.userName}</p>
+                            <p class="text-xs text-gray-500">${b.userReg}</p>
+                        </td>
+                        <td class="p-3 font-medium">${b.title}</td>
+                        <td class="p-3 text-center">
+                            <span class="px-2 py-1 rounded text-xs font-bold ${b.status === 'Lendo' ? 'text-blue-600 bg-blue-50' : b.status === 'Lido' ? 'text-green-600 bg-green-50' : 'text-purple-600 bg-purple-50'}">${b.status}</span>
+                        </td>
+                        <td class="p-3 text-center space-x-2">
+                            <button onclick="openEditBookModal('${b.id}')" class="text-gray-600 hover:text-primary"><i class="ph-bold ph-pencil-simple"></i></button>
+                            <button onclick="deleteBook('${b.id}')" class="text-red-500 hover:text-red-700"><i class="ph-bold ph-trash"></i></button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            // Tab 2: Gestão de Atividades Globais
+            const list = document.getElementById('admin-activities-list');
+            if(activities.length === 0) {
+                list.innerHTML = `<p class="text-gray-500 text-center py-4 border rounded-xl bg-gray-50">Nenhuma atividade registrada.</p>`;
+            } else {
+                const allActs = [...activities].sort((a,b) => b.id - a.id);
+                list.innerHTML = allActs.map(act => {
+                    const u = users.find(user => user.id === act.userId);
+                    const isPending = act.status === 'pending';
+                    
+                    let badgeClass = "bg-green-100 text-green-800 border-green-200";
+                    let badgeIcon = "ph-check-circle";
+                    let badgeText = "Aprovado";
+                    if(isPending) { badgeClass = "bg-yellow-100 text-yellow-800 border-yellow-200"; badgeIcon = "ph-clock"; badgeText = "Pendente"; }
+                    if(act.points < 0) { badgeClass = "bg-red-100 text-red-800 border-red-200"; badgeIcon = "ph-warning"; badgeText = "Punição"; }
+
+                    let actIcon = "ph-activity";
+                    if(act.type === 'summary') actIcon = "ph-calendar-blank";
+                    if(act.type === 'checkin') actIcon = "ph-map-pin";
+                    if(act.type === 'book') actIcon = "ph-book-open";
+                    if(act.type === 'infraction') actIcon = "ph-warning-octagon";
+
+                    return `
+                    <div class="flex flex-col md:flex-row items-center justify-between p-4 border rounded-xl bg-gray-50">
+                        <div class="flex items-center gap-4 mb-4 md:mb-0 w-full md:w-auto">
+                            <img src="${u ? u.foto : ''}" crossorigin="anonymous" class="w-12 h-12 rounded-full object-cover shadow-sm bg-white hidden md:block" onerror="this.src='https://placehold.co/50x50'">
+                            <div>
+                                <p class="font-bold text-sm text-gray-800">${u ? u.nome : 'Desconhecido'} <span class="text-xs text-gray-500 font-normal">(${u ? u.registro : ''})</span></p>
+                                <p class="text-sm font-medium text-primary flex items-center"><i class="ph ${actIcon} mr-1"></i> ${act.title}</p>
+                                <p class="text-xs mt-1 text-gray-500">
+                                    Data: ${act.date.split('-').reverse().join('/')} ${act.time ? 'às '+act.time : ''} | 
+                                    <span class="font-bold ${act.points < 0 ? 'text-red-600' : 'text-green-600'}">Pts: ${formatPts(act.points)}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-2 w-full md:w-auto justify-end items-center">
+                            <span class="px-2 py-1 rounded-lg text-xs font-bold flex items-center border ${badgeClass}"><i class="ph-bold ${badgeIcon} mr-1"></i> ${badgeText}</span>
+                            ${isPending ? `<button onclick="approveSummary('${act.id}')" class="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-700 transition">Aprovar (+50)</button>` : ''}
+                            <button onclick="openEditActivityModal('${act.id}')" class="bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs hover:bg-gray-300 transition"><i class="ph-bold ph-pencil-simple"></i></button>
+                            <button onclick="deleteActivity('${act.id}')" class="bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-xs hover:bg-red-200 transition"><i class="ph-bold ph-trash"></i></button>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+
+            // Tab 4: Ranking
+            const tbodyRanking = document.getElementById('admin-ranking-body');
+            const rankingData = users.map(u => {
+                const pts = activities.filter(a => a.userId === u.id && a.status === 'approved').reduce((sum, a) => sum + parseFloat(a.points), 0);
+                return { ...u, points: pts };
+            }).sort((a, b) => b.points - a.points);
+
+            if(rankingData.length === 0) {
+                tbodyRanking.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-500">Nenhum leitor registrado.</td></tr>`;
+            } else {
+                tbodyRanking.innerHTML = rankingData.map((u, i) => `
+                    <tr class="border-b">
+                        <td class="p-3 font-bold ${i===0?'text-yellow-500 text-lg': i===1?'text-gray-400': i===2?'text-orange-400':'text-gray-600'}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1+'º'}</td>
+                        <td class="p-3 font-medium text-gray-800 flex items-center gap-2">
+                            <img src="${u.foto}" crossorigin="anonymous" class="w-6 h-6 rounded-full object-cover"> ${u.nome}
+                        </td>
+                        <td class="p-3 text-sm text-gray-600 hidden md:table-cell">${u.registro}</td>
+                        <td class="p-3 text-right font-bold text-primary">${formatPts(u.points)} pts</td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        // --- Generic Admin Actions ---
+
+        // Edit Book
+        window.openEditBookModal = function(bookId) {
+            const b = books.find(x => x.id === bookId);
+            if(b) {
+                document.getElementById('edit-book-id').value = b.id;
+                document.getElementById('edit-book-title').value = b.title;
+                document.getElementById('edit-book-status').value = b.status;
+                document.getElementById('modal-edit-book').classList.remove('hidden');
+            }
+        }
+        document.getElementById('form-edit-book').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = document.getElementById('edit-book-id').value;
+            const b = books.find(x => x.id === id);
+            if(b) {
+                b.title = document.getElementById('edit-book-title').value;
+                b.status = document.getElementById('edit-book-status').value;
+                saveData();
+                closeModal('modal-edit-book');
+                showMessage('admin-msg-box', 'Leitura atualizada com sucesso!', false);
+                loadAdminDashboard();
+            }
+        });
+        window.deleteBook = function(bookId) {
+            if(confirm("Tem certeza que deseja excluir esta leitura? Isso não removerá os pontos já atribuídos (para isso edite a aba Atividades).")) {
+                books = books.filter(b => b.id !== bookId);
+                saveData();
+                loadAdminDashboard();
+            }
+        }
+
+        // Edit Activity (Universal)
+        window.openEditActivityModal = function(actId) {
+            const act = activities.find(a => a.id === actId);
+            if(act) {
+                document.getElementById('edit-act-id').value = act.id;
+                document.getElementById('edit-act-title').value = act.title;
+                document.getElementById('edit-act-date').value = act.date;
+                document.getElementById('edit-act-time').value = act.time || '';
+                document.getElementById('edit-act-points').value = parseFloat(act.points);
+                document.getElementById('modal-edit-activity').classList.remove('hidden');
+            }
+        }
+        document.getElementById('form-edit-activity').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = document.getElementById('edit-act-id').value;
+            const act = activities.find(a => a.id === id);
+            if(act) {
+                act.title = document.getElementById('edit-act-title').value;
+                act.date = document.getElementById('edit-act-date').value;
+                act.time = document.getElementById('edit-act-time').value;
+                act.points = parseFloat(document.getElementById('edit-act-points').value);
+                saveData();
+                closeModal('modal-edit-activity');
+                showMessage('admin-msg-box', 'Atividade atualizada com sucesso!', false);
+                loadAdminDashboard();
+            }
+        });
+
+        window.deleteActivity = function(actId) {
+            if(confirm("Excluir esta atividade removerá os pontos associados. Tem certeza?")) {
+                activities = activities.filter(a => a.id !== actId);
+                saveData();
+                showMessage('admin-msg-box', 'Atividade excluída.', true);
+                loadAdminDashboard();
+            }
+        }
+
+        window.approveSummary = function(actId) {
+            if(confirm("Aprovar resumo e liberar 50 pontos?")) {
+                const act = activities.find(a => a.id === actId);
+                if(act) {
+                    act.status = 'approved';
+                    if(act.bookId) {
+                        const b = books.find(book => book.id === act.bookId);
+                        if(b) b.status = 'Resumo Entregue';
+                    }
+                    saveData();
+                    showMessage('admin-msg-box', 'Resumo aprovado! Pontos creditados.', false);
+                    loadAdminDashboard();
+                }
+            }
+        }
+
+        window.closeModal = function(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        // Apply Infraction
+        document.getElementById('form-infraction').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const identifier = document.getElementById('inf-user').value.trim();
+            const user = users.find(u => u.registro === identifier || u.documento === identifier);
+            
+            if(!user) {
+                showMessage('admin-msg-box', 'Leitor não encontrado. Verifique o Registro ou CPF.', true);
+                return;
+            }
+
+            const penaltyPts = parseFloat(document.getElementById('inf-nivel').value);
+            const reason = document.getElementById('inf-motivo').value;
+
+            activities.push({
+                id: Date.now().toString(), userId: user.id, type: 'infraction',
+                title: `Infração: ${reason}`, date: new Date().toISOString().split('T')[0], 
+                status: 'approved', points: penaltyPts
+            });
+            
+            saveData();
+            document.getElementById('form-infraction').reset();
+            showMessage('admin-msg-box', `Punição aplicada a ${user.nome}. ${penaltyPts} pontos.`, true);
+            loadAdminDashboard();
+        });
+
+
+        // --- Export to CSV Logic ---
+        function escapeCSV(str) {
+            if (str === undefined || str === null) return '""';
+            const s = String(str).replace(/"/g, '""');
+            return `"${s}"`;
+        }
+
+        window.exportCSV = function(type) {
+            let csvContent = "";
+            let filename = "";
+            const bom = "\uFEFF"; 
+
+            if (type === 'users') {
+                filename = "RL_Leitores_Cadastrados.csv";
+                csvContent += "ID;Registro;Nome;Documento;Nascimento;Endereço;Telefone;Resp_Nome;Resp_Documento;Resp_Telefone;Data_Hora_Cadastro\n";
+                users.forEach(u => {
+                    csvContent += `${escapeCSV(u.id)};${escapeCSV(u.registro)};${escapeCSV(u.nome)};${escapeCSV(u.documento)};${escapeCSV(u.nascimento)};${escapeCSV(u.endereco)};${escapeCSV(u.telefone)};${escapeCSV(u.respNome)};${escapeCSV(u.respDoc)};${escapeCSV(u.respTel)};${escapeCSV(u.dataCadastro)}\n`;
+                });
+            } 
+            else if (type === 'books') {
+                filename = "RL_Materiais_Lidos.csv";
+                csvContent += "Registro_Leitor;Nome_Leitor;Titulo_Livro;Data_Registro;Status\n";
+                books.forEach(b => {
+                    const u = users.find(user => user.id === b.userId);
+                    csvContent += `${escapeCSV(u ? u.registro : 'N/A')};${escapeCSV(u ? u.nome : 'N/A')};${escapeCSV(b.title)};${escapeCSV(b.dateAdded)};${escapeCSV(b.status)}\n`;
+                });
+            }
+            else if (type === 'checkins') {
+                filename = "RL_Checkins.csv";
+                csvContent += "Registro_Leitor;Nome_Leitor;Data;Hora_Entrada;Hora_Saida;Coordenadas;Pontos_Recebidos\n";
+                const checkins = activities.filter(a => a.type === 'checkin');
+                checkins.forEach(c => {
+                    const u = users.find(user => user.id === c.userId);
+                    csvContent += `${escapeCSV(u ? u.registro : 'N/A')};${escapeCSV(u ? u.nome : 'N/A')};${escapeCSV(c.date)};${escapeCSV(c.time)};${escapeCSV(c.checkoutTime || 'Ainda na Biblioteca')};${escapeCSV(c.coords)};${escapeCSV(c.points)}\n`;
+                });
+            }
+            else if (type === 'ranking') {
+                filename = "RL_Ranking_Parcial.csv";
+                csvContent += "Posicao;Registro;Nome;Pontos_Totais\n";
+                const rankingData = users.map(u => {
+                    const pts = activities.filter(a => a.userId === u.id && a.status === 'approved').reduce((sum, a) => sum + parseFloat(a.points), 0);
+                    return { ...u, points: pts };
+                }).sort((a, b) => b.points - a.points);
+                
+                rankingData.forEach((u, i) => {
+                    csvContent += `${i + 1};${escapeCSV(u.registro)};${escapeCSV(u.nome)};${escapeCSV(formatPts(u.points))}\n`;
+                });
+            }
+
+            const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Initialize view
+        switchView('view-login');
+    </script>
+</body>
+</html>
