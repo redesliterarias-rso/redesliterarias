@@ -5,28 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plataforma Redes Literárias</title>
     
-    <!-- Tailwind CSS para Estilização -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome para Ícones -->
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- React, ReactDOM e Babel (para rodar direto no navegador) -->
+    <!-- React & Babel -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Biblioteca SheetJS para Exportação Profissional em Excel (.xlsx) -->
+    <!-- Excel Export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
+    <!-- FIREBASE (Banco de Dados em Nuvem) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
     <style>
-        /* Estilos customizados para barra de rolagem e modais */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         .modal-overlay { background-color: rgba(0, 59, 73, 0.7); backdrop-filter: blur(4px); }
         
-        /* Fundo Tecnológico com Rede de Pesca e Nós */
         .tech-net-bg {
             background-color: #f8b417;
             background-image: 
@@ -37,7 +39,6 @@
             background-position: 0 0, 0 0, 0 0;
         }
 
-        /* Animação de Celebração */
         @keyframes popIn {
             0% { transform: scale(0.8); opacity: 0; }
             100% { transform: scale(1); opacity: 1; }
@@ -56,8 +57,21 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // --- FUNÇÕES AUXILIARES ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBjGF-lwJt1Lk7zlEZou42zQRiUOfPlh24",
+            authDomain: "redes-literarias-rso.firebaseapp.com",
+            databaseURL: "https://redes-literarias-rso-default-rtdb.firebaseio.com",
+            projectId: "redes-literarias-rso",
+            storageBucket: "redes-literarias-rso.firebasestorage.app",
+            messagingSenderId: "469426150346",
+            appId: "1:469426150346:web:bec753b21cf64b7eca8d33"
+        };
         
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.firestore();
+
         function calculateUserPoints(userId, activities) {
             let pts = activities.filter(a => a.userId === userId).reduce((sum, act) => {
                 if (act.status === 'summary_approved' || act.type === 'checkin' || act.type === 'event' || act.type === 'book' && act.status !== 'penalty') {
@@ -68,28 +82,24 @@
                 }
                 return sum;
             }, 0);
-            return Math.round(pts * 10) / 10; // Arredonda para 1 casa decimal para evitar bugs do JS
+            return Math.round(pts * 10) / 10; 
         }
 
-        // Lógica de Pontuação por Minutos
         function calcVisitPoints(minutes) {
             if (minutes < 20) return 0;
             if (minutes < 30) return 0.5;
             if (minutes < 40) return 1.0;
             if (minutes < 60) return 2.0;
             
-            // A partir de 1h (60 min) = 3 pontos. Cada 20 min extras = +1 ponto.
             let pts = 3.0;
             let extraMins = minutes - 60;
             pts += Math.floor(extraMins / 20) * 1.0;
             return pts;
         }
 
-        // Exportação Completa em Múltiplas Abas (Planilha Excel Real)
         function exportToExcel(users, activities, ranking) {
             const wb = XLSX.utils.book_new();
 
-            // Aba 1: Leitores
             const leitoresData = users.map(u => ({
                 'Nº Registro': u.registro, 'Nome Completo': u.nome, 'CPF': u.documento, 'Idade': u.idade, 'WhatsApp': u.telefone, 'Endereço': u.endereco, 
                 'Nome Responsável': u.nomeResponsavel || 'N/A', 'Vínculo': u.vinculoResponsavel || 'N/A', 'Contato Resp.': u.telefoneResponsavel || 'N/A',
@@ -97,7 +107,6 @@
             }));
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(leitoresData), "Leitores");
 
-            // Aba 2: Livros e Resumos
             const livrosData = activities.filter(a => a.type === 'book').map(b => {
                 const u = users.find(user => user.id === b.userId);
                 return {
@@ -110,7 +119,6 @@
             });
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(livrosData), "Livros e Resumos");
 
-            // Aba 3: Eventos
             const eventosData = activities.filter(a => a.type === 'event' && a.status === 'completed').map(e => {
                 const u = users.find(user => user.id === e.userId);
                 return {
@@ -121,7 +129,6 @@
             });
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(eventosData), "Eventos");
 
-            // Aba 4: Infrações
             const infracoesData = activities.filter(a => a.type === 'penalty').map(p => {
                 const u = users.find(user => user.id === p.userId);
                 return {
@@ -132,13 +139,11 @@
             });
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(infracoesData), "Infrações");
 
-            // Aba 5: Ranking Geral
             const rankingData = ranking.map((r, index) => ({
                 'Posição': `${index + 1}º`, 'Nome do Leitor': r.nome, 'Registro': r.registro, 'Pontuação Final': r.points
             }));
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rankingData), "Ranking Geral");
 
-            // Baixar o arquivo Excel
             XLSX.writeFile(wb, "Banco_de_Dados_RedesLiterarias.xlsx");
         }
 
@@ -146,29 +151,37 @@
             const [currentView, setCurrentView] = useState('login'); 
             const [currentUser, setCurrentUser] = useState(null);
             
-            // Banco de Dados Local (localStorage) à prova de falhas
-            const [users, setUsers] = useState(() => {
-                try { const saved = localStorage.getItem('redes_users_v5'); return saved ? JSON.parse(saved) : []; } 
-                catch (e) { return []; }
-            });
-            
-            const [activities, setActivities] = useState(() => {
-                try { const saved = localStorage.getItem('redes_activities_v5'); return saved ? JSON.parse(saved) : []; } 
-                catch (e) { return []; }
-            });
+            // Estado do React (Será alimentado pelo Firebase)
+            const [users, setUsers] = useState([]);
+            const [activities, setActivities] = useState([]);
 
-            useEffect(() => { localStorage.setItem('redes_users_v5', JSON.stringify(users)); }, [users]);
-            useEffect(() => { localStorage.setItem('redes_activities_v5', JSON.stringify(activities)); }, [activities]);
+            // Sincronização em Tempo Real com o Firebase
+            useEffect(() => {
+                // Escuta os usuários
+                const unsubUsers = db.collection('users').onSnapshot(snapshot => {
+                    const usersData = snapshot.docs.map(doc => doc.data());
+                    setUsers(usersData);
+                });
+
+                // Escuta as atividades
+                const unsubActivities = db.collection('activities').onSnapshot(snapshot => {
+                    const actData = snapshot.docs.map(doc => doc.data());
+                    setActivities(actData);
+                });
+
+                return () => { unsubUsers(); unsubActivities(); };
+            }, []);
 
             const handleLogin = (userType, user) => {
                 setCurrentUser(user);
                 setCurrentView(userType);
             };
 
+            // Roteamento
             if (currentView === 'login') return <LoginScreen onLogin={handleLogin} onRegister={() => setCurrentView('register')} users={users} />;
-            if (currentView === 'register') return <RegisterScreen onCancel={() => setCurrentView('login')} onSuccess={(newUser) => { setUsers([...users, newUser]); handleLogin('user', newUser); }} users={users} />;
-            if (currentView === 'user') return <UserDashboard user={currentUser} onLogout={() => {setCurrentUser(null); setCurrentView('login');}} activities={activities} setActivities={setActivities} />;
-            if (currentView === 'admin') return <AdminDashboard onLogout={() => {setCurrentUser(null); setCurrentView('login');}} users={users} setUsers={setUsers} activities={activities} setActivities={setActivities} />;
+            if (currentView === 'register') return <RegisterScreen onCancel={() => setCurrentView('login')} users={users} onSuccess={(newUser) => { handleLogin('user', newUser); }} />;
+            if (currentView === 'user') return <UserDashboard user={currentUser} onLogout={() => {setCurrentUser(null); setCurrentView('login');}} activities={activities} />;
+            if (currentView === 'admin') return <AdminDashboard onLogout={() => {setCurrentUser(null); setCurrentView('login');}} users={users} activities={activities} />;
             
             return <div>Erro Crítico.</div>;
         }
@@ -184,7 +197,7 @@
                 e.preventDefault();
                 const user = users.find(u => u.registro === identifier || u.documento === identifier);
                 if (user) onLogin('user', user);
-                else setError('Leitor não encontrado. Verifique o registro/CPF ou cadastre-se.');
+                else setError('Leitor não encontrado no Banco de Dados. Verifique o registro/CPF ou cadastre-se.');
             };
 
             const handleAdminLogin = (e) => {
@@ -221,7 +234,7 @@
                                     <div className="text-center pt-6 mt-4 border-t">
                                         {new Date() > new Date('2026-07-17T17:00:00-03:00') ? (
                                             <div className="p-4 bg-red-50 text-red-700 rounded-xl font-bold shadow-inner border border-red-200">
-                                                <i className="fas fa-lock mr-2"></i> Inscrições encerradas (17/07/2026 às 17h)
+                                                <i className="fas fa-lock mr-2"></i> Inscrições encerradas
                                             </div>
                                         ) : (
                                             <button type="button" onClick={onRegister} className="w-full bg-[#f8b417] text-[#003b49] py-4 rounded-xl font-black hover:bg-yellow-400 shadow-md">Fazer Inscrição Agora</button>
@@ -261,6 +274,7 @@
             const [selfieUrl, setSelfieUrl] = useState(null);
             const [age, setAge] = useState(null);
             const [error, setError] = useState('');
+            const [isSaving, setIsSaving] = useState(false);
             const [cameraActive, setCameraActive] = useState(false);
             
             const videoRef = useRef(null);
@@ -322,12 +336,11 @@
                 setCameraActive(false);
             };
 
-            const handleSubmit = (e) => {
+            const handleSubmit = async (e) => {
                 e.preventDefault();
                 if (age < 11) { setError('Idade mínima não atingida.'); return; }
                 if (!selfieUrl) { setError('Adicione uma foto de perfil.'); return; }
                 
-                // Trava Antifraude (Nome ou CPF únicos)
                 const leitorExiste = users.some(u => u.documento === formData.documento || u.nome.trim().toLowerCase() === formData.nome.trim().toLowerCase());
                 if (leitorExiste) { setError('Atenção: Já existe um leitor cadastrado com este Nome ou Documento (CPF).'); window.scrollTo(0,0); return; }
                 
@@ -335,9 +348,18 @@
                     setError('Dados do responsável são obrigatórios para menores de idade.'); return;
                 }
 
+                setIsSaving(true);
                 const registro = Math.floor(100000 + Math.random() * 900000).toString();
                 const newUser = { ...formData, id: Date.now().toString(), registro: `RSO-${registro}`, foto: selfieUrl, idade: age, dataCadastro: new Date().toISOString() };
-                onSuccess(newUser);
+                
+                try {
+                    // GRAVA NO FIREBASE
+                    await db.collection('users').doc(newUser.id).set(newUser);
+                    onSuccess(newUser);
+                } catch (err) {
+                    setError("Erro de conexão com o banco de dados. Tente novamente.");
+                    setIsSaving(false);
+                }
             };
 
             return (
@@ -391,26 +413,28 @@
                                 </div>
                             )}
 
-                            <button type="submit" disabled={age !== null && age < 11} className={`w-full py-4 rounded-xl font-black text-xl shadow-xl mt-6 ${age !== null && age < 11 ? 'bg-gray-300 text-gray-500' : 'bg-[#f8b417] text-[#003b49] hover:bg-yellow-400 transition'}`}>Finalizar Inscrição</button>
+                            <button type="submit" disabled={(age !== null && age < 11) || isSaving} className={`w-full py-4 rounded-xl font-black text-xl shadow-xl mt-6 ${(age !== null && age < 11) || isSaving ? 'bg-gray-300 text-gray-500' : 'bg-[#f8b417] text-[#003b49] hover:bg-yellow-400 transition'}`}>
+                                {isSaving ? <i className="fas fa-spinner fa-spin"></i> : "Finalizar Inscrição"}
+                            </button>
                         </form>
                     </div>
                 </div>
             );
         }
 
-        function UserDashboard({ user, onLogout, activities, setActivities }) {
+        function UserDashboard({ user, onLogout, activities }) {
             const [activeTab, setActiveTab] = useState('perfil'); 
             const [msg, setMsg] = useState(null);
             const [celebration, setCelebration] = useState(null); 
             const [bookData, setBookData] = useState({ title: '', author: '', year: '' });
             const [eventCheckinName, setEventCheckinName] = useState('');
             
-            // Scheduling Tab States
             const [schedulingBookId, setSchedulingBookId] = useState('');
             const [scheduleDate, setScheduleDate] = useState('');
             const [scheduleTime, setScheduleTime] = useState('');
 
             const [isCheckingIn, setIsCheckingIn] = useState(false);
+            
             const activeLibraryCheckin = activities.find(a => a.userId === user.id && a.type === 'checkin' && a.status === 'active');
             const activeEventCheckin = activities.find(a => a.userId === user.id && a.type === 'event' && a.status === 'active');
             const userActivities = activities.filter(a => a.userId === user.id);
@@ -445,54 +469,35 @@
 
                 const img = new Image(); img.crossOrigin = "Anonymous";
                 img.onload = () => drawProfile(img);
-                img.onerror = () => { showMsg('Erro ao carregar foto na carteirinha.', 'error'); };
                 img.src = user.foto;
             };
 
-            const handleRegisterBook = (e) => {
+            const handleRegisterBook = async (e) => {
                 e.preventDefault();
                 if(!bookData.title || !bookData.author) return;
                 const newActivity = { id: Date.now().toString(), userId: user.id, type: 'book', title: bookData.title, author: bookData.author, year: bookData.year, date: new Date().toISOString(), status: 'reading', points: 10, rating: 0 };
-                setActivities([...activities, newActivity]); setBookData({ title: '', author: '', year: '' });
+                
+                await db.collection('activities').doc(newActivity.id).set(newActivity);
+                setBookData({ title: '', author: '', year: '' });
                 showMsg('Livro registrado! Status: Lendo. Você ganhou 10 pontos.', 'success');
             };
 
-            const updateBookStatus = (activityId, newStatus) => {
-                setActivities(activities.map(act => act.id === activityId ? { ...act, status: newStatus, lastUpdate: new Date().toISOString() } : act));
+            const updateBookStatus = async (activityId, newStatus) => {
+                await db.collection('activities').doc(activityId).update({ status: newStatus, lastUpdate: new Date().toISOString() });
                 if (newStatus === 'read') showCelebrationMsg("Parabéns! Você concluiu mais uma leitura! 🎉");
                 else showMsg(`Status atualizado para: ${newStatus}`, 'success');
             };
 
-            const handleRateBook = (activityId, star) => {
-                setActivities(activities.map(act => act.id === activityId ? { ...act, rating: star } : act));
+            const handleRateBook = async (activityId, star) => {
+                await db.collection('activities').doc(activityId).update({ rating: star });
             };
 
-            // Função CORRIGIDA para manipular a data sem crashar
-            const handleScheduleDate = (e) => {
-                const dateStr = e.target.value;
-                if(!dateStr) { setScheduleDate(''); return; }
-                
-                const [y, m, d] = dateStr.split('-');
-                const dateObj = new Date(y, m - 1, d);
-                const dayOfWeek = dateObj.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
-                
-                if (dayOfWeek < 2 || dayOfWeek > 4) { 
-                    showMsg('Agendamentos apenas de Terça a Quinta-feira.', 'error'); 
-                    setScheduleDate(''); 
-                } else { 
-                    setScheduleDate(dateStr); 
-                }
-            };
-
-            const confirmSchedule = (e) => {
+            const confirmSchedule = async (e) => {
                 e.preventDefault();
                 if(!scheduleDate || !scheduleTime || !schedulingBookId) return;
                 
-                const updated = activities.map(act => {
-                    if (act.id === schedulingBookId) return { ...act, status: 'schedule_pending', scheduleDate, scheduleTime, lastUpdate: new Date().toISOString() };
-                    return act;
-                });
-                setActivities(updated);
+                await db.collection('activities').doc(schedulingBookId).update({ status: 'schedule_pending', scheduleDate, scheduleTime, lastUpdate: new Date().toISOString() });
+                
                 setSchedulingBookId(''); setScheduleDate(''); setScheduleTime('');
                 setActiveTab('leituras');
                 showMsg('Solicitação enviada! Aguarde o Administrador confirmar o seu agendamento.', 'success');
@@ -500,36 +505,57 @@
 
             const handleCheckInLibrary = () => {
                 setIsCheckingIn(true);
-                setTimeout(() => {
-                    const newAct = { id: Date.now().toString(), userId: user.id, type: 'checkin', status: 'active', checkInTime: new Date().toISOString(), date: new Date().toISOString().split('T')[0] };
-                    setActivities([...activities, newAct]); showMsg(`Check-in na biblioteca realizado!`, 'success'); setIsCheckingIn(false);
-                }, 1000);
+                if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(async (position) => {
+                        const { latitude, longitude } = position.coords;
+                        const libraryLat = -9.62; const libraryLng = -42.08;
+                        const R = 6371;
+                        const dLat = (latitude - libraryLat) * Math.PI / 180;
+                        const dLon = (longitude - libraryLng) * Math.PI / 180;
+                        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(libraryLat * Math.PI / 180) * Math.cos(latitude * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+                        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                        const distance = R * c;
+
+                        if (distance <= 1) { // 1km tolerance
+                            const newAct = { id: Date.now().toString(), userId: user.id, type: 'checkin', status: 'active', checkInTime: new Date().toISOString(), date: new Date().toISOString().split('T')[0] };
+                            await db.collection('activities').doc(newAct.id).set(newAct);
+                            showMsg(`Check-in na biblioteca realizado!`, 'success');
+                        } else {
+                            showMsg('Você não está próximo à biblioteca.', 'error');
+                        }
+                        setIsCheckingIn(false);
+                    }, (error) => {
+                        showMsg('Erro ao obter localização. Permita o acesso ao GPS.', 'error');
+                        setIsCheckingIn(false);
+                    });
+                } else {
+                    showMsg('Geolocalização não suportada no seu navegador.', 'error');
+                    setIsCheckingIn(false);
+                }
             };
 
-            const handleCheckOutLibrary = () => {
+            const handleCheckOutLibrary = async () => {
                 if(!activeLibraryCheckin) return;
                 const diffMinutes = Math.floor(Math.abs(new Date() - new Date(activeLibraryCheckin.checkInTime)) / 60000);
                 const earned = calcVisitPoints(diffMinutes);
                 
-                if (earned === 0) {
-                    setActivities(activities.map(act => act.id === activeLibraryCheckin.id ? { ...act, status: 'completed', checkOutTime: new Date().toISOString(), points: 0 } : act));
-                    showMsg(`Check-out. Você ficou menos de 20 minutos, portanto não pontuou desta vez.`, 'error');
-                } else {
-                    setActivities(activities.map(act => act.id === activeLibraryCheckin.id ? { ...act, status: 'completed', checkOutTime: new Date().toISOString(), points: earned } : act));
-                    showMsg(`Check-out realizado! Você ganhou ${earned} pontos.`, 'success');
-                }
+                await db.collection('activities').doc(activeLibraryCheckin.id).update({ status: 'completed', checkOutTime: new Date().toISOString(), points: earned });
+                
+                if (earned === 0) showMsg(`Check-out. Você ficou menos de 20 minutos e não pontuou desta vez.`, 'error');
+                else showMsg(`Check-out realizado! Você ganhou ${earned} pontos.`, 'success');
             };
 
-            const handleCheckInEvent = (e) => {
+            const handleCheckInEvent = async (e) => {
                 e.preventDefault();
                 if(!eventCheckinName) return;
                 const newAct = { id: Date.now().toString(), userId: user.id, type: 'event', title: eventCheckinName, status: 'active', checkInTime: new Date().toISOString(), date: new Date().toISOString().split('T')[0] };
-                setActivities([...activities, newAct]); setEventCheckinName(''); showMsg(`Check-in no Evento realizado!`, 'success');
+                await db.collection('activities').doc(newAct.id).set(newAct);
+                setEventCheckinName(''); showMsg(`Check-in no Evento realizado!`, 'success');
             };
 
-            const handleCheckOutEvent = () => {
+            const handleCheckOutEvent = async () => {
                 if(!activeEventCheckin) return;
-                setActivities(activities.map(act => act.id === activeEventCheckin.id ? { ...act, status: 'completed', checkOutTime: new Date().toISOString(), points: 30 } : act));
+                await db.collection('activities').doc(activeEventCheckin.id).update({ status: 'completed', checkOutTime: new Date().toISOString(), points: 30 });
                 showCelebrationMsg(`Incrível! Presença no evento confirmada! +30 pts 🎉`);
             };
 
@@ -677,10 +703,10 @@
                                                             </div>
                                                         )}
                                                         {book.status === 'schedule_pending' && (
-                                                            <span className="block w-full bg-yellow-100 text-yellow-800 px-3 py-2 rounded-lg text-sm font-bold text-center"><i className="fas fa-hourglass-half mr-1"></i> Agendamento em análise ({book.scheduleDate.split('-').reverse().join('/')} às {book.scheduleTime})</span>
+                                                            <span className="block w-full bg-yellow-100 text-yellow-800 px-3 py-2 rounded-lg text-sm font-bold text-center"><i className="fas fa-hourglass-half mr-1"></i> Agendamento em análise ({book.scheduleDate?.split('-').reverse().join('/')} às {book.scheduleTime})</span>
                                                         )}
                                                         {book.status === 'schedule_approved' && (
-                                                            <span className="block w-full bg-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-bold text-center"><i className="fas fa-calendar-check mr-1"></i> Resumo Agendado ({book.scheduleDate.split('-').reverse().join('/')} às {book.scheduleTime})</span>
+                                                            <span className="block w-full bg-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-bold text-center"><i className="fas fa-calendar-check mr-1"></i> Resumo Agendado ({book.scheduleDate?.split('-').reverse().join('/')} às {book.scheduleTime})</span>
                                                         )}
                                                         {book.status === 'summary_approved' && (
                                                             <span className="block w-full bg-green-100 text-green-700 px-3 py-2 rounded-lg text-sm font-bold text-center"><i className="fas fa-check-double mr-1"></i> Resumo Aprovado (+50 pts)</span>
@@ -708,7 +734,7 @@
                                             <div className="text-center py-10">
                                                 <i className="fas fa-book-open fa-3x text-gray-300 mb-4"></i>
                                                 <p className="text-gray-500 font-bold text-lg">Nenhum livro aguardando agendamento.</p>
-                                                <p className="text-sm text-gray-400 mt-2">Termine uma leitura e marque como "Lido" para agendar.</p>
+                                                <p className="text-sm text-gray-400 mt-2">Termine uma leitura, vá na aba "Minhas Leituras" e marque como "Lido" para agendar.</p>
                                             </div>
                                         ) : (
                                             <form onSubmit={confirmSchedule} className="space-y-4 max-w-md">
@@ -722,8 +748,8 @@
                                                     </select>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-bold mb-1">Data Desejada (Terça a Quinta)</label>
-                                                    <input required type="date" min={new Date().toISOString().split('T')[0]} value={scheduleDate} onChange={handleScheduleDate} className="w-full p-3 border rounded-xl bg-gray-50" />
+                                                    <label className="block text-sm font-bold mb-1">Data Desejada</label>
+                                                    <input required type="date" min={new Date().toISOString().split('T')[0]} value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} className="w-full p-3 border rounded-xl bg-gray-50" />
                                                 </div>
                                                 <div>
                                                     <label className="block text-sm font-bold mb-1">Horário (09:00 às 17:30)</label>
@@ -752,7 +778,7 @@
             );
         }
 
-        function AdminDashboard({ onLogout, users, setUsers, activities, setActivities }) {
+        function AdminDashboard({ onLogout, users, activities }) {
             const [activeTab, setActiveTab] = useState('leituras'); 
             const [msg, setMsg] = useState(null);
             const [celebration, setCelebration] = useState(null);
@@ -767,41 +793,47 @@
             const pendingSchedules = activities.filter(a => a.type === 'book' && a.status === 'schedule_pending');
             const approvedSchedules = activities.filter(a => a.type === 'book' && a.status === 'schedule_approved');
             
-            const handleApproveSchedule = (activityId) => {
-                setActivities(activities.map(act => act.id === activityId ? { ...act, status: 'schedule_approved' } : act));
+            const handleApproveSchedule = async (activityId) => {
+                await db.collection('activities').doc(activityId).update({ status: 'schedule_approved' });
                 showMsg('Horário aprovado! O leitor deve comparecer.', 'success');
             };
 
-            const handleRejectSchedule = (activityId) => {
-                setActivities(activities.map(act => act.id === activityId ? { ...act, status: 'read', scheduleDate: null, scheduleTime: null } : act));
+            const handleRejectSchedule = async (activityId) => {
+                await db.collection('activities').doc(activityId).update({ status: 'read', scheduleDate: null, scheduleTime: null });
                 showMsg('Agendamento rejeitado.', 'error');
             };
 
-            const handleConfirmSummaryDelivery = (activityId) => {
-                setActivities(activities.map(act => act.id === activityId ? { ...act, status: 'summary_approved', points: 50 } : act));
+            const handleConfirmSummaryDelivery = async (activityId) => {
+                await db.collection('activities').doc(activityId).update({ status: 'summary_approved', points: 50 });
                 showCelebrationMsg('Fantástico! Resumo aprovado e 50 pontos liberados para o leitor! 🎉');
             };
 
-            const handleDeleteUser = (userId) => {
+            const handleDeleteUser = async (userId) => {
                 if(window.confirm('TEM CERTEZA? Isso excluirá o leitor permanentemente.')) {
-                    setUsers(users.filter(u => u.id !== userId));
-                    setActivities(activities.filter(a => a.userId !== userId));
+                    await db.collection('users').doc(userId).delete();
+                    
+                    // Deleta as atividades relacionadas (simples)
+                    activities.filter(a => a.userId === userId).forEach(async act => {
+                        await db.collection('activities').doc(act.id).delete();
+                    });
+
                     showMsg('Leitor excluído com sucesso.', 'success');
                 }
             };
 
-            const handleSaveUserEdit = (e) => {
+            const handleSaveUserEdit = async (e) => {
                 e.preventDefault();
-                setUsers(users.map(u => u.id === editingUser.id ? editingUser : u));
+                await db.collection('users').doc(editingUser.id).update(editingUser);
                 setEditingUser(null);
                 showMsg('Dados atualizados.', 'success');
             };
 
-            const handleApplyPenalty = (e) => {
+            const handleApplyPenalty = async (e) => {
                 e.preventDefault();
                 if(!penaltyData.reason) return;
                 const newAct = { id: Date.now().toString(), userId: penalizingUser.id, type: 'penalty', title: `Infração: ${penaltyData.reason}`, date: new Date().toISOString(), pointsDeducted: parseInt(penaltyData.points) };
-                setActivities([...activities, newAct]);
+                
+                await db.collection('activities').doc(newAct.id).set(newAct);
                 setPenalizingUser(null); setPenaltyData({reason:'', points:10});
                 showMsg('Infração aplicada com sucesso.', 'error'); 
             };
@@ -852,7 +884,7 @@
                                                                 <div>
                                                                     <p className="font-black text-lg">{u.nome} <span className="text-xs bg-white px-2 rounded border">{u.registro}</span></p>
                                                                     <p className="text-sm font-bold text-yellow-800"><i className="fas fa-book mr-1"></i> {act.title} ({act.author})</p>
-                                                                    <p className="text-sm font-black text-indigo-700 mt-1"><i className="fas fa-clock mr-1"></i> Solicitado para: {act.scheduleDate.split('-').reverse().join('/')} às {act.scheduleTime}</p>
+                                                                    <p className="text-sm font-black text-indigo-700 mt-1"><i className="fas fa-clock mr-1"></i> Solicitado para: {act.scheduleDate?.split('-').reverse().join('/')} às {act.scheduleTime}</p>
                                                                 </div>
                                                             </div>
                                                             <div className="flex gap-2">
@@ -879,7 +911,7 @@
                                                                 <div>
                                                                     <p className="font-black text-lg">{u.nome}</p>
                                                                     <p className="text-sm font-bold text-indigo-800"><i className="fas fa-book mr-1"></i> {act.title}</p>
-                                                                    <p className="text-sm font-black text-indigo-700 mt-1"><i className="fas fa-calendar-check mr-1"></i> Agendado: {act.scheduleDate.split('-').reverse().join('/')} às {act.scheduleTime}</p>
+                                                                    <p className="text-sm font-black text-indigo-700 mt-1"><i className="fas fa-calendar-check mr-1"></i> Agendado: {act.scheduleDate?.split('-').reverse().join('/')} às {act.scheduleTime}</p>
                                                                 </div>
                                                             </div>
                                                             <button onClick={() => handleConfirmSummaryDelivery(act.id)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black hover:bg-indigo-700 shadow-lg whitespace-nowrap"><i className="fas fa-check-double mr-2"></i> Confirmar Entrega (+50 pts)</button>
@@ -973,7 +1005,7 @@
                                 <div className="text-center py-16 max-w-lg mx-auto">
                                     <i className="fas fa-file-excel fa-5x text-green-600 mb-6"></i>
                                     <h2 className="text-3xl font-black text-gray-800 mb-4">Planilha Completa do Sistema</h2>
-                                    <p className="text-gray-500 mb-8 font-medium">Baixe um arquivo do Excel (.xlsx) contendo 5 abas separadas com todos os dados de Leitores, Livros, Eventos, Infrações e o Ranking oficial.</p>
+                                    <p className="text-gray-500 mb-8 font-medium">Baixe um arquivo do Excel (.xlsx) contendo 5 abas separadas com todos os dados salvos em Nuvem.</p>
                                     <button onClick={handleAdminExportData} className="bg-green-600 text-white font-black text-xl px-10 py-5 w-full rounded-2xl shadow-xl hover:bg-green-700 flex justify-center items-center"><i className="fas fa-download mr-3"></i> Baixar Relatório (Excel)</button>
                                 </div>
                             )}
