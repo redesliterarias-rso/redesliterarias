@@ -862,6 +862,7 @@
                         <div className="flex overflow-x-auto bg-white rounded-2xl shadow-sm mb-6 border border-gray-200">
                             <button onClick={()=>setActiveTab('leituras')} className={`py-4 px-6 font-black text-sm whitespace-nowrap transition ${activeTab==='leituras'?'bg-[#003b49] text-white':'text-gray-600'}`}><i className="fas fa-book-reader mr-2"></i> Gestão de Resumos {(pendingSchedules.length + approvedSchedules.length) > 0 && <span className="bg-red-500 text-white ml-2 px-2 py-0.5 rounded-full">{pendingSchedules.length + approvedSchedules.length}</span>}</button>
                             <button onClick={()=>setActiveTab('leitores')} className={`py-4 px-6 font-black text-sm whitespace-nowrap transition border-l ${activeTab==='leitores'?'bg-[#003b49] text-white':'text-gray-600'}`}><i className="fas fa-users-cog mr-2"></i> Gestão de Leitores</button>
+                            <button onClick={()=>setActiveTab('status_leituras')} className={`py-4 px-6 font-black text-sm whitespace-nowrap transition border-l ${activeTab==='status_leituras'?'bg-[#003b49] text-white':'text-gray-600'}`}><i className="fas fa-book-open mr-2"></i> Status das Leituras</button>
                             <button onClick={()=>setActiveTab('eventos')} className={`py-4 px-6 font-black text-sm whitespace-nowrap transition border-l ${activeTab==='eventos'?'bg-[#003b49] text-white':'text-gray-600'}`}><i className="fas fa-star mr-2"></i> Eventos Finalizados</button>
                             <button onClick={()=>setActiveTab('ranking')} className={`py-4 px-6 font-black text-sm whitespace-nowrap transition border-l ${activeTab==='ranking'?'bg-[#003b49] text-white':'text-gray-600'}`}><i className="fas fa-trophy mr-2"></i> Ranking</button>
                             <button onClick={()=>setActiveTab('exportar')} className={`py-4 px-6 font-black text-sm whitespace-nowrap transition border-l ${activeTab==='exportar'?'bg-[#003b49] text-white':'text-gray-600'}`}><i className="fas fa-file-excel mr-2"></i> Planilhas Gerais</button>
@@ -950,6 +951,44 @@
                                                     </td>
                                                 </tr>
                                             ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+
+                            {activeTab === 'status_leituras' && (
+                                <div className="overflow-x-auto border border-gray-200 rounded-3xl">
+                                    <h2 className="text-2xl font-black text-gray-800 m-5 border-b pb-2">Acompanhamento Geral de Leituras</h2>
+                                    <table className="w-full text-left border-collapse text-sm">
+                                        <thead className="bg-gray-100 text-gray-600 font-bold uppercase text-xs">
+                                            <tr><th className="p-5">Leitor</th><th className="p-5">Livro / Autor</th><th className="p-5">Status Atual</th><th className="p-5 text-right">Data de Início</th></tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {activities.filter(a => a.type === 'book').sort((a, b) => new Date(b.date) - new Date(a.date)).map(book => {
+                                                const u = getUserInfo(book.userId); if(!u) return null;
+                                                return (
+                                                    <tr key={book.id} className="hover:bg-blue-50">
+                                                        <td className="p-5 flex items-center gap-3">
+                                                            <img src={u.foto} className="w-10 h-10 rounded-full object-cover border" />
+                                                            <div><p className="font-bold text-gray-900">{u.nome}</p><p className="text-xs font-mono text-gray-500">Reg: {u.registro}</p></div>
+                                                        </td>
+                                                        <td className="p-5">
+                                                            <p className="font-bold text-gray-800">{book.title}</p>
+                                                            <p className="text-xs text-gray-600">{book.author} {book.year ? `(${book.year})` : ''}</p>
+                                                        </td>
+                                                        <td className="p-5">
+                                                            {book.status === 'reading' && <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-xs font-bold inline-block">Lendo</span>}
+                                                            {book.status === 'read' && <span className="bg-gray-200 text-gray-700 px-3 py-1 rounded-lg text-xs font-bold inline-block">Livro Lido (Sem agendamento)</span>}
+                                                            {book.status === 'schedule_pending' && <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-lg text-xs font-bold inline-block">Agendamento Pendente</span>}
+                                                            {book.status === 'schedule_approved' && <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg text-xs font-bold inline-block">Resumo Agendado</span>}
+                                                            {book.status === 'summary_approved' && <span className="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-xs font-bold inline-block">Resumo Aprovado (+50 pts)</span>}
+                                                        </td>
+                                                        <td className="p-5 text-right font-bold text-gray-500">
+                                                            {new Date(book.date).toLocaleDateString()}
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
