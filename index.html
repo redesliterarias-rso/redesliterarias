@@ -3,60 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plataforma Redes Literárias</title>
+    <title>Sistema Redes Literárias</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- React & Babel -->
+    <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel (para JSX) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Excel Export -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Excel Export (SheetJS) -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 
-    <!-- FIREBASE (Banco de Dados em Nuvem) -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <!-- HTML2Canvas (Para baixar a carteirinha) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <style>
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        .modal-overlay { background-color: rgba(0, 59, 73, 0.7); backdrop-filter: blur(4px); }
-        
-        .tech-net-bg {
+        body { font-family: 'Inter', sans-serif; }
+        .bg-net {
             background-color: #f8b417;
-            background-image: 
-                radial-gradient(circle at center, #003b49 2px, transparent 2px),
-                linear-gradient(45deg, transparent 49%, rgba(0, 59, 73, 0.15) 49%, rgba(0, 59, 73, 0.15) 51%, transparent 51%),
-                linear-gradient(-45deg, transparent 49%, rgba(0, 59, 73, 0.15) 49%, rgba(0, 59, 73, 0.15) 51%, transparent 51%);
-            background-size: 40px 40px, 40px 40px, 40px 40px;
-            background-position: 0 0, 0 0, 0 0;
+            background-image: radial-gradient(#d49a14 2px, transparent 2px);
+            background-size: 30px 30px;
         }
-
-        @keyframes popIn {
-            0% { transform: scale(0.8); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-        .animate-pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-<body class="bg-gray-100 font-sans text-gray-800 antialiased selection:bg-yellow-300 selection:text-blue-900">
-    <div id="root">
-        <div class="min-h-screen flex flex-col items-center justify-center text-[#003b49] tech-net-bg">
-            <i class="fas fa-circle-notch fa-spin fa-4x mb-4 bg-white rounded-full p-2 shadow-lg"></i>
-            <h2 class="text-2xl font-black bg-white px-4 py-2 rounded-xl shadow-md mt-2">Iniciando Plataforma...</h2>
-        </div>
-    </div>
+<body>
+    <div id="root"></div>
 
-    <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
-
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        
+        // Suas chaves exatas e corretas do Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyBjGF-lwJt1Lk7zlEZou42zQRiUOfPlh24",
             authDomain: "redes-literarias-rso.firebaseapp.com",
@@ -66,124 +52,85 @@
             messagingSenderId: "469426150346",
             appId: "1:469426150346:web:bec753b21cf64b7eca8d33"
         };
+
+        // Exportando para o escopo global para o React acessar
+        window.app = initializeApp(firebaseConfig);
+        window.db = getFirestore(window.app);
+        window.fb = { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where };
         
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        const db = firebase.firestore();
+        // Avisa ao React que o banco está pronto
+        window.dispatchEvent(new Event('firebaseReady'));
+    </script>
 
-        function calculateUserPoints(userId, activities) {
-            let pts = activities.filter(a => a.userId === userId).reduce((sum, act) => {
-                if (act.status === 'summary_approved' || act.type === 'checkin' || act.type === 'event' || act.type === 'book' && act.status !== 'penalty') {
-                    return sum + (act.points || 0);
-                }
-                if (act.type === 'penalty') {
-                    return sum - (act.pointsDeducted || 0);
-                }
-                return sum;
-            }, 0);
-            return Math.round(pts * 10) / 10; 
-        }
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
 
-        function calcVisitPoints(minutes) {
-            if (minutes < 20) return 0;
-            if (minutes < 30) return 0.5;
-            if (minutes < 40) return 1.0;
-            if (minutes < 60) return 2.0;
-            
-            let pts = 3.0;
-            let extraMins = minutes - 60;
-            pts += Math.floor(extraMins / 20) * 1.0;
-            return pts;
-        }
-
-        function exportToExcel(users, activities, ranking) {
-            const wb = XLSX.utils.book_new();
-
-            const leitoresData = users.map(u => ({
-                'Nº Registro': u.registro, 'Nome Completo': u.nome, 'CPF': u.documento, 'Idade': u.idade, 'WhatsApp': u.telefone, 'Endereço': u.endereco, 
-                'Nome Responsável': u.nomeResponsavel || 'N/A', 'Vínculo': u.vinculoResponsavel || 'N/A', 'Contato Resp.': u.telefoneResponsavel || 'N/A',
-                'Data Inscrição': new Date(u.dataCadastro).toLocaleDateString()
-            }));
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(leitoresData), "Leitores");
-
-            const livrosData = activities.filter(a => a.type === 'book').map(b => {
-                const u = users.find(user => user.id === b.userId);
-                return {
-                    'Leitor': u ? u.nome : 'Desconhecido', 'Registro': u ? u.registro : '',
-                    'Título da Obra': b.title, 'Autor': b.author, 'Ano': b.year, 
-                    'Status Atual': b.status === 'summary_approved' ? 'Resumo Aprovado' : b.status === 'schedule_approved' ? 'Agendado' : b.status === 'schedule_pending' ? 'Aguardando Agendamento' : b.status === 'read' ? 'Lido' : 'Lendo',
-                    'Avaliação (Estrelas)': b.rating ? `${b.rating}/5` : 'Não Avaliado',
-                    'Pontos Ganhos': b.points || 0
-                };
-            });
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(livrosData), "Livros e Resumos");
-
-            const eventosData = activities.filter(a => a.type === 'event' && a.status === 'completed').map(e => {
-                const u = users.find(user => user.id === e.userId);
-                return {
-                    'Leitor': u ? u.nome : 'Desconhecido', 'Registro': u ? u.registro : '',
-                    'Nome do Evento': e.title, 'Data da Participação': new Date(e.checkInTime).toLocaleDateString(),
-                    'Pontos Ganhos': e.points
-                };
-            });
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(eventosData), "Eventos");
-
-            const infracoesData = activities.filter(a => a.type === 'penalty').map(p => {
-                const u = users.find(user => user.id === p.userId);
-                return {
-                    'Leitor': u ? u.nome : 'Desconhecido', 'Registro': u ? u.registro : '',
-                    'Motivo da Infração': p.title.replace('Infração: ', ''), 'Data': new Date(p.date).toLocaleDateString(),
-                    'Pontos Descontados': p.pointsDeducted
-                };
-            });
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(infracoesData), "Infrações");
-
-            const rankingData = ranking.map((r, index) => ({
-                'Posição': `${index + 1}º`, 'Nome do Leitor': r.nome, 'Registro': r.registro, 'Pontuação Final': r.points
-            }));
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rankingData), "Ranking Geral");
-
-            XLSX.writeFile(wb, "Banco_de_Dados_RedesLiterarias.xlsx");
-        }
+        // Data limite configurada para 31/07/2026 às 23:59:59
+        const DEADLINE = new Date('2026-07-31T23:59:59-03:00');
 
         function App() {
             const [currentView, setCurrentView] = useState('login'); 
             const [currentUser, setCurrentUser] = useState(null);
             
-            // Estado do React (Será alimentado pelo Firebase)
+            // Dados da Nuvem
             const [users, setUsers] = useState([]);
-            const [activities, setActivities] = useState([]);
+            const [activities, setActivities] = useState([]); 
+            const [isFirebaseLoaded, setIsFirebaseLoaded] = useState(false);
 
-            // Sincronização em Tempo Real com o Firebase
+            // Carregamento do Banco de Dados
             useEffect(() => {
-                // Escuta os usuários
-                const unsubUsers = db.collection('users').onSnapshot(snapshot => {
-                    const usersData = snapshot.docs.map(doc => doc.data());
-                    setUsers(usersData);
-                });
+                const initDB = () => {
+                    const usersRef = window.fb.collection(window.db, "users");
+                    const actRef = window.fb.collection(window.db, "activities");
 
-                // Escuta as atividades
-                const unsubActivities = db.collection('activities').onSnapshot(snapshot => {
-                    const actData = snapshot.docs.map(doc => doc.data());
-                    setActivities(actData);
-                });
+                    window.fb.onSnapshot(usersRef, (snapshot) => {
+                        const loadedUsers = [];
+                        snapshot.forEach((doc) => loadedUsers.push({ ...doc.data(), dbId: doc.id }));
+                        setUsers(loadedUsers);
+                    });
 
-                return () => { unsubUsers(); unsubActivities(); };
+                    window.fb.onSnapshot(actRef, (snapshot) => {
+                        const loadedActs = [];
+                        snapshot.forEach((doc) => loadedActs.push({ ...doc.data(), dbId: doc.id }));
+                        setActivities(loadedActs);
+                    });
+                    
+                    setIsFirebaseLoaded(true);
+                };
+
+                if (window.db) {
+                    initDB();
+                } else {
+                    window.addEventListener('firebaseReady', initDB);
+                }
             }, []);
+
+            if (!isFirebaseLoaded) {
+                return (
+                    <div className="min-h-screen flex flex-col items-center justify-center text-[#003b49] bg-yellow-50">
+                        <i className="fas fa-circle-notch fa-spin fa-3x mb-4"></i>
+                        <h2 className="text-xl font-bold">Conectando à Nuvem...</h2>
+                    </div>
+                );
+            }
 
             const handleLogin = (userType, user) => {
                 setCurrentUser(user);
                 setCurrentView(userType);
             };
 
-            // Roteamento
+            const handleLogout = () => {
+                setCurrentUser(null);
+                setCurrentView('login');
+            };
+
+            // Roteamento de Telas
             if (currentView === 'login') return <LoginScreen onLogin={handleLogin} onRegister={() => setCurrentView('register')} users={users} />;
-            if (currentView === 'register') return <RegisterScreen onCancel={() => setCurrentView('login')} users={users} onSuccess={(newUser) => { handleLogin('user', newUser); }} />;
-            if (currentView === 'user') return <UserDashboard user={currentUser} onLogout={() => {setCurrentUser(null); setCurrentView('login');}} activities={activities} />;
-            if (currentView === 'admin') return <AdminDashboard onLogout={() => {setCurrentUser(null); setCurrentView('login');}} users={users} activities={activities} />;
-            
-            return <div>Erro Crítico.</div>;
+            if (currentView === 'register') return <RegisterScreen onCancel={() => setCurrentView('login')} users={users} />;
+            if (currentView === 'user') return <UserDashboard user={currentUser} onLogout={handleLogout} activities={activities} />;
+            if (currentView === 'admin') return <AdminDashboard onLogout={handleLogout} users={users} activities={activities} />;
+
+            return null;
         }
 
         function LoginScreen({ onLogin, onRegister, users }) {
@@ -193,46 +140,55 @@
             const [password, setPassword] = useState('');
             const [error, setError] = useState('');
 
+            // Checa se o prazo estourou
+            const isRegistrationClosed = new Date() > DEADLINE;
+
             const handleUserLogin = (e) => {
                 e.preventDefault();
                 const user = users.find(u => u.registro === identifier || u.documento === identifier);
                 if (user) onLogin('user', user);
-                else setError('Leitor não encontrado no Banco de Dados. Verifique o registro/CPF ou cadastre-se.');
+                else setError('Registro ou CPF não encontrado. Verifique os dados.');
             };
 
             const handleAdminLogin = (e) => {
                 e.preventDefault();
                 if (email === 'bibliotecaderemanso@gmail.com' && password === 'Rso.redes.2026#') {
                     onLogin('admin', { role: 'admin', name: 'Administração' });
-                } else setError('Credenciais inválidas.');
+                } else {
+                    setError('Credenciais de administrador inválidas.');
+                }
             };
 
             return (
-                <div className="min-h-screen flex flex-col items-center justify-center p-4 relative tech-net-bg">
-                    <div className="absolute inset-0 bg-white bg-opacity-20 pointer-events-none"></div>
-                    <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden relative z-10 border border-yellow-400">
-                        <div className="p-8 bg-[#003b49] text-white flex flex-col items-center relative">
-                            <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center mb-4 shadow-xl p-1 relative z-10 border-4 border-[#f8b417]">
-                                <img src="Redes%20liter%C3%A1rias_Biblioteca%20(1).png" alt="Logo" className="w-full h-full object-contain rounded-full" onError={(e)=>{e.target.style.display='none'}} />
-                            </div>
-                            <h1 className="text-3xl font-black text-center tracking-tight text-[#f8b417]">Redes Literárias</h1>
-                            <p className="text-sm text-blue-100 mt-2 font-medium tracking-wide uppercase">Biblioteca de Remanso</p>
+                <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-net font-sans text-gray-800">
+                    <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-yellow-300">
+                        <div className="p-8 bg-[#003b49] text-white flex flex-col items-center">
+                            <img src="Redes literárias_Biblioteca (1).png" alt="Redes Literárias" className="w-36 h-36 object-contain bg-white rounded-full p-2 mb-4 shadow-lg border-4 border-[#f8b417]" />
+                            <h1 className="text-2xl font-black text-center tracking-wide">Desafio Redes Literárias</h1>
+                            <p className="text-yellow-400 text-sm font-semibold mt-1">Biblioteca Municipal Délio Ledoux</p>
                         </div>
                         
-                        <div className="flex border-b border-gray-200">
-                            <button className={`flex-1 py-4 font-black transition-colors ${mode === 'user' ? 'text-[#003b49] border-b-4 border-[#003b49] bg-gray-50' : 'text-gray-400'}`} onClick={() => { setMode('user'); setError(''); }}><i className="fas fa-user-graduate mr-2"></i> Sou Leitor</button>
-                            <button className={`flex-1 py-4 font-black transition-colors ${mode === 'admin' ? 'text-[#003b49] border-b-4 border-[#003b49] bg-gray-50' : 'text-gray-400'}`} onClick={() => { setMode('admin'); setError(''); }}><i className="fas fa-shield-alt mr-2"></i> Admin</button>
+                        <div className="flex border-b bg-gray-50">
+                            <button className={`flex-1 py-4 font-bold text-sm ${mode === 'user' ? 'text-[#003b49] border-b-4 border-[#003b49] bg-white' : 'text-gray-400'}`} onClick={() => { setMode('user'); setError(''); }}>
+                                <i className="fas fa-book-reader mr-2"></i> Sou Leitor
+                            </button>
+                            <button className={`flex-1 py-4 font-bold text-sm ${mode === 'admin' ? 'text-[#003b49] border-b-4 border-[#003b49] bg-white' : 'text-gray-400'}`} onClick={() => { setMode('admin'); setError(''); }}>
+                                <i className="fas fa-shield-alt mr-2"></i> Admin
+                            </button>
                         </div>
 
                         <div className="p-8">
-                            {error && <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg text-sm font-bold shadow-inner border border-red-200"><i className="fas fa-exclamation-triangle mr-3"></i>{error}</div>}
+                            {error && <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm font-bold rounded-r-lg"><i className="fas fa-exclamation-circle mr-2"></i>{error}</div>}
                             
                             {mode === 'user' ? (
                                 <form onSubmit={handleUserLogin} className="space-y-5">
-                                    <div><label className="block text-sm font-bold text-gray-700 mb-2">Registro ou CPF</label><input type="text" value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="w-full p-4 border rounded-xl focus:ring-4 focus:ring-yellow-200 outline-none" required /></div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">Registro ou CPF</label>
+                                        <input type="text" value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-[#003b49] outline-none font-medium bg-gray-50" placeholder="Ex: RSO-123456 ou 000.000.000-00" required />
+                                    </div>
                                     <button type="submit" className="w-full bg-[#003b49] text-white py-4 rounded-xl font-black text-lg shadow-lg hover:bg-gray-800 transition">Entrar no Painel</button>
                                     <div className="text-center pt-6 mt-4 border-t">
-                                        {new Date() > new Date('2026-07-17T17:00:00-03:00') ? (
+                                        {isRegistrationClosed ? (
                                             <div className="p-4 bg-red-50 text-red-700 rounded-xl font-bold shadow-inner border border-red-200">
                                                 <i className="fas fa-lock mr-2"></i> Inscrições encerradas
                                             </div>
@@ -243,9 +199,15 @@
                                 </form>
                             ) : (
                                 <form onSubmit={handleAdminLogin} className="space-y-5">
-                                    <div><label className="block text-sm font-bold text-gray-700 mb-2">E-mail Institucional</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none" required /></div>
-                                    <div><label className="block text-sm font-bold text-gray-700 mb-2">Senha</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none" required /></div>
-                                    <button type="submit" className="w-full bg-gray-900 text-white py-4 rounded-xl font-black text-lg shadow-lg mt-2">Acessar Sistema</button>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">E-mail Administrativo</label>
+                                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-[#003b49] outline-none font-medium bg-gray-50" required />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">Senha Segura</label>
+                                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-[#003b49] outline-none font-medium bg-gray-50" required />
+                                    </div>
+                                    <button type="submit" className="w-full bg-[#003b49] text-white py-4 rounded-xl font-black text-lg shadow-lg hover:bg-gray-800 transition mt-2">Acessar Sistema</button>
                                 </form>
                             )}
                         </div>
@@ -254,8 +216,8 @@
             );
         }
 
-        function RegisterScreen({ onCancel, onSuccess, users }) {
-            const isRegistrationClosed = new Date() > new Date('2026-07-17T17:00:00-03:00');
+        function RegisterScreen({ onCancel, users }) {
+            const isRegistrationClosed = new Date() > DEADLINE;
 
             if (isRegistrationClosed) {
                 return (
@@ -263,7 +225,7 @@
                         <div className="bg-white p-10 rounded-[2rem] shadow-xl max-w-md w-full text-center border-4 border-red-500">
                             <i className="fas fa-lock fa-4x text-red-500 mb-6"></i>
                             <h2 className="text-3xl font-black text-gray-800 mb-4">Inscrições Encerradas</h2>
-                            <p className="text-gray-600 font-bold mb-8">O prazo oficial para novas inscrições encerrou no dia 17/07/2026 às 17h00.</p>
+                            <p className="text-gray-600 font-bold mb-8">O prazo oficial para novas inscrições encerrou.</p>
                             <button onClick={onCancel} className="w-full bg-[#003b49] text-white px-6 py-4 rounded-xl font-black hover:bg-gray-800 transition shadow-lg">Voltar ao Início</button>
                         </div>
                     </div>
@@ -274,15 +236,14 @@
             const [selfieUrl, setSelfieUrl] = useState(null);
             const [age, setAge] = useState(null);
             const [error, setError] = useState('');
-            const [isSaving, setIsSaving] = useState(false);
-            const [cameraActive, setCameraActive] = useState(false);
-            
-            const videoRef = useRef(null);
-            const streamRef = useRef(null);
+            const [loading, setLoading] = useState(false);
+            const [successMsg, setSuccessMsg] = useState(false);
+            const [regNumber, setRegNumber] = useState('');
 
             const calculateAge = (dobString) => {
                 if (!dobString) return null;
-                const dob = new Date(dobString); const today = new Date();
+                const dob = new Date(dobString);
+                const today = new Date();
                 let calcAge = today.getFullYear() - dob.getFullYear();
                 const m = today.getMonth() - dob.getMonth();
                 if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) calcAge--;
@@ -290,8 +251,10 @@
             };
 
             const handleDateChange = (e) => {
-                const newDate = e.target.value; setFormData({ ...formData, nascimento: newDate });
-                const calcAge = calculateAge(newDate); setAge(calcAge);
+                const d = e.target.value;
+                setFormData({ ...formData, nascimento: d });
+                const calcAge = calculateAge(d);
+                setAge(calcAge);
                 if (calcAge !== null && calcAge < 11) setError('É necessário ter pelo menos 11 anos para participar.');
                 else setError('');
             };
@@ -299,122 +262,146 @@
             const handleImageUpload = (e) => {
                 const file = e.target.files[0];
                 if (file) {
-                    if (file.size > 2 * 1024 * 1024) { setError('Imagem muito grande (Máx 2MB).'); return; }
                     const reader = new FileReader();
                     reader.onloadend = () => setSelfieUrl(reader.result);
                     reader.readAsDataURL(file);
                 }
             };
 
-            const startCamera = async () => {
-                try {
-                    setError('');
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    streamRef.current = stream;
-                    setCameraActive(true);
-                    setTimeout(() => {
-                        if(videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
-                    }, 200);
-                } catch (err) {
-                    setError("Erro ao acessar câmera. O navegador pode estar bloqueando. Use 'Anexar Arquivo'.");
-                }
-            };
-
-            const takePhoto = () => {
-                if(videoRef.current) {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = videoRef.current.videoWidth;
-                    canvas.height = videoRef.current.videoHeight;
-                    canvas.getContext('2d').drawImage(videoRef.current, 0, 0);
-                    setSelfieUrl(canvas.toDataURL('image/jpeg', 0.8));
-                    stopCamera();
-                }
-            };
-
-            const stopCamera = () => {
-                if(streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
-                setCameraActive(false);
-            };
-
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 if (age < 11) { setError('Idade mínima não atingida.'); return; }
-                if (!selfieUrl) { setError('Adicione uma foto de perfil.'); return; }
+                if (!selfieUrl) { setError('Adicione uma foto (selfie ou arquivo) para a sua carteirinha.'); return; }
                 
-                const leitorExiste = users.some(u => u.documento === formData.documento || u.nome.trim().toLowerCase() === formData.nome.trim().toLowerCase());
-                if (leitorExiste) { setError('Atenção: Já existe um leitor cadastrado com este Nome ou Documento (CPF).'); window.scrollTo(0,0); return; }
-                
-                if (age < 18 && (!formData.nomeResponsavel || !formData.docResponsavel || !formData.vinculoResponsavel)) {
-                    setError('Dados do responsável são obrigatórios para menores de idade.'); return;
+                // Bloqueio Antifraude: Verifica se já existe Nome ou CPF
+                const exists = users.find(u => 
+                    u.documento.replace(/\D/g, '') === formData.documento.replace(/\D/g, '') || 
+                    u.nome.trim().toLowerCase() === formData.nome.trim().toLowerCase()
+                );
+
+                if (exists) {
+                    setError('Atenção: Já existe um leitor cadastrado com este Nome ou CPF.');
+                    return;
                 }
 
-                setIsSaving(true);
+                setLoading(true);
                 const registro = Math.floor(100000 + Math.random() * 900000).toString();
-                const newUser = { ...formData, id: Date.now().toString(), registro: `RSO-${registro}`, foto: selfieUrl, idade: age, dataCadastro: new Date().toISOString() };
+                const num = `RSO-${registro}`;
                 
+                const newUser = {
+                    ...formData,
+                    id: Date.now().toString(),
+                    registro: num,
+                    foto: selfieUrl,
+                    idade: age,
+                    createdAt: new Date().toISOString()
+                };
+
                 try {
-                    // GRAVA NO FIREBASE
-                    await db.collection('users').doc(newUser.id).set(newUser);
-                    onSuccess(newUser);
+                    await window.fb.addDoc(window.fb.collection(window.db, "users"), newUser);
+                    setRegNumber(num);
+                    setSuccessMsg(true);
                 } catch (err) {
-                    setError("Erro de conexão com o banco de dados. Tente novamente.");
-                    setIsSaving(false);
+                    setError("Erro de conexão. Tente novamente.");
                 }
+                setLoading(false);
             };
 
+            if (successMsg) {
+                return (
+                    <div className="min-h-screen bg-green-50 flex items-center justify-center p-4">
+                        <div className="bg-white p-10 rounded-[2rem] shadow-xl max-w-md w-full text-center border-4 border-green-500">
+                            <i className="fas fa-check-circle fa-4x text-green-500 mb-6"></i>
+                            <h2 className="text-3xl font-black text-gray-800 mb-4">Inscrição Concluída!</h2>
+                            <p className="text-gray-600 font-medium mb-4">Seu número de registro oficial é:</p>
+                            <div className="bg-gray-100 p-4 rounded-xl text-3xl font-black text-[#003b49] mb-8">{regNumber}</div>
+                            <button onClick={onCancel} className="w-full bg-[#003b49] text-white px-6 py-4 rounded-xl font-black hover:bg-gray-800 transition shadow-lg">Ir para o Login</button>
+                        </div>
+                    </div>
+                );
+            }
+
             return (
-                <div className="min-h-screen bg-gray-50 py-8 px-4">
-                    <div className="max-w-3xl mx-auto bg-white rounded-[2rem] shadow-xl p-6 md:p-10">
-                        <button onClick={onCancel} className="text-[#003b49] mb-6 flex items-center font-bold hover:underline bg-blue-50 px-4 py-2 rounded-xl transition"><i className="fas fa-arrow-left mr-2"></i> Voltar</button>
-                        <h2 className="text-3xl font-black text-[#003b49] mb-6 border-b pb-4">Nova Inscrição</h2>
-                        {error && <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 font-bold shadow-sm">{error}</div>}
+                <div className="min-h-screen bg-gray-100 p-4 py-8 font-sans text-gray-800">
+                    <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl p-6 md:p-10 border-t-8 border-[#f8b417]">
+                        <button onClick={onCancel} className="text-gray-500 hover:text-[#003b49] mb-6 flex items-center font-bold transition">
+                            <i className="fas fa-arrow-left mr-2"></i> Voltar ao Login
+                        </button>
+                        
+                        <h2 className="text-3xl font-black text-[#003b49] mb-2">Cadastro de Leitor</h2>
+                        <p className="text-gray-500 font-medium mb-8">Preencha com atenção. Seus dados gerarão sua carteirinha.</p>
+                        
+                        {error && <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 font-bold flex items-start"><i className="fas fa-exclamation-triangle mt-1 mr-3"></i><p>{error}</p></div>}
 
                         <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="p-6 border-2 border-dashed border-gray-300 rounded-3xl bg-gray-50 text-center">
-                                {cameraActive ? (
-                                    <div className="flex flex-col items-center">
-                                        <video ref={videoRef} className="w-full max-w-sm rounded-2xl border-4 border-[#f8b417] shadow-lg mb-4 bg-black" playsInline></video>
-                                        <div className="flex gap-4">
-                                             <button type="button" onClick={takePhoto} className="bg-green-500 text-white px-6 py-2 rounded-xl font-bold shadow-md"><i className="fas fa-camera mr-2"></i>Capturar</button>
-                                             <button type="button" onClick={stopCamera} className="bg-red-500 text-white px-6 py-2 rounded-xl font-bold shadow-md"><i className="fas fa-times mr-2"></i>Cancelar</button>
-                                        </div>
-                                    </div>
+                            <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-2xl bg-gray-50">
+                                {selfieUrl ? (
+                                    <img src={selfieUrl} alt="Selfie" className="w-32 h-32 rounded-full object-cover border-4 border-[#f8b417] shadow-md" />
                                 ) : (
-                                    <div className="flex flex-col items-center">
-                                        {selfieUrl ? <img src={selfieUrl} className="w-32 h-32 rounded-full object-cover border-4 border-[#f8b417] shadow-xl mb-4" /> : <div className="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 shadow-inner mb-4"><i className="fas fa-user-circle fa-4x"></i></div>}
-                                        <div className="flex flex-wrap justify-center gap-3 mt-2">
-                                            <button type="button" onClick={startCamera} className="bg-[#003b49] text-white px-5 py-2.5 rounded-xl font-bold hover:bg-opacity-90 shadow-md flex items-center"><i className="fas fa-camera mr-2"></i> Tirar Foto</button>
-                                            <label className="cursor-pointer bg-gray-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-opacity-90 shadow-md flex items-center"><i className="fas fa-upload mr-2"></i> Anexar Arquivo
-                                                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                                            </label>
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-3 font-bold">Esta foto irá para a sua carteirinha oficial.</p>
+                                    <div className="w-32 h-32 rounded-full bg-white border-4 border-gray-200 flex items-center justify-center text-gray-400 shadow-inner">
+                                        <i className="fas fa-camera text-4xl"></i>
                                     </div>
                                 )}
+                                <div className="mt-6 flex gap-3">
+                                    <label className="cursor-pointer bg-[#003b49] text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-gray-800 transition shadow-md flex items-center">
+                                        <i className="fas fa-camera mr-2"></i> Tirar Foto (Câmera)
+                                        <input type="file" accept="image/*" capture="user" className="hidden" onChange={handleImageUpload} />
+                                    </label>
+                                    <label className="cursor-pointer bg-gray-200 text-gray-700 px-4 py-3 rounded-xl text-sm font-bold hover:bg-gray-300 transition shadow-md flex items-center">
+                                        <i className="fas fa-upload mr-2"></i> Anexar Arquivo
+                                        <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                                    </label>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-4 font-medium"><i className="fas fa-info-circle mr-1"></i> Escolha uma foto nítida do seu rosto para a carteirinha.</p>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div className="md:col-span-2"><label className="block text-sm font-black mb-2">Nome Completo</label><input required type="text" value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} className="w-full p-3 border rounded-xl" /></div>
-                                <div><label className="block text-sm font-black mb-2">Data Nascimento</label><input required type="date" value={formData.nascimento} onChange={handleDateChange} className="w-full p-3 border rounded-xl" /></div>
-                                <div><label className="block text-sm font-black mb-2">RG ou CPF</label><input required type="text" value={formData.documento} onChange={e => setFormData({...formData, documento: e.target.value})} className="w-full p-3 border rounded-xl" /></div>
-                                <div className="md:col-span-2"><label className="block text-sm font-black mb-2">Endereço</label><input required type="text" value={formData.endereco} onChange={e => setFormData({...formData, endereco: e.target.value})} className="w-full p-3 border rounded-xl" /></div>
-                                <div className="md:col-span-2"><label className="block text-sm font-black mb-2">WhatsApp</label><input required type="text" value={formData.telefone} onChange={e => setFormData({...formData, telefone: e.target.value})} className="w-full p-3 border rounded-xl" /></div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">Nome Completo</label>
+                                    <input type="text" required value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-[#003b49] outline-none bg-gray-50 font-medium" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">Data de Nascimento</label>
+                                    <input type="date" required value={formData.nascimento} onChange={handleDateChange} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-[#003b49] outline-none bg-gray-50 font-medium" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">CPF</label>
+                                    <input type="text" required value={formData.documento} onChange={e => setFormData({...formData, documento: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-[#003b49] outline-none bg-gray-50 font-medium" />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">Endereço Completo</label>
+                                    <input type="text" required value={formData.endereco} onChange={e => setFormData({...formData, endereco: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-[#003b49] outline-none bg-gray-50 font-medium" />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">Telefone / WhatsApp</label>
+                                    <input type="text" required value={formData.telefone} onChange={e => setFormData({...formData, telefone: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-[#003b49] outline-none bg-gray-50 font-medium" />
+                                </div>
                             </div>
 
                             {age !== null && age >= 11 && age < 18 && (
-                                <div className="p-6 bg-yellow-50 border-2 border-yellow-300 rounded-3xl mt-6">
-                                    <h3 className="font-black text-yellow-900 mb-4 flex items-center"><i className="fas fa-shield-alt mr-2"></i> Dados do Responsável (Obrigatório)</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="md:col-span-2"><label className="block text-xs font-bold mb-1">Nome do Responsável</label><input required type="text" value={formData.nomeResponsavel} onChange={e => setFormData({...formData, nomeResponsavel: e.target.value})} className="w-full p-3 border border-yellow-400 rounded-xl" /></div>
-                                        <div><label className="block text-xs font-bold mb-1">CPF Responsável</label><input required type="text" value={formData.docResponsavel} onChange={e => setFormData({...formData, docResponsavel: e.target.value})} className="w-full p-3 border border-yellow-400 rounded-xl" /></div>
-                                        <div><label className="block text-xs font-bold mb-1">Vínculo (Pai, Mãe, etc)</label><input required type="text" value={formData.vinculoResponsavel} onChange={e => setFormData({...formData, vinculoResponsavel: e.target.value})} className="w-full p-3 border border-yellow-400 rounded-xl" /></div>
-                                        <div className="md:col-span-2"><label className="block text-xs font-bold mb-1">Telefone Responsável</label><input required type="text" value={formData.telefoneResponsavel} onChange={e => setFormData({...formData, telefoneResponsavel: e.target.value})} className="w-full p-3 border border-yellow-400 rounded-xl" /></div>
+                                <div className="p-6 bg-yellow-50 border-2 border-yellow-300 rounded-2xl space-y-5">
+                                    <h3 className="font-black text-yellow-800 flex items-center text-lg">
+                                        <i className="fas fa-shield-alt mr-2"></i> Dados do Responsável (Obrigatório)
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                        <div className="md:col-span-2">
+                                            <label className="block text-sm font-bold text-gray-700 mb-2">Nome do Responsável</label>
+                                            <input type="text" required value={formData.nomeResponsavel} onChange={e => setFormData({...formData, nomeResponsavel: e.target.value})} className="w-full p-4 border-2 border-yellow-200 rounded-xl bg-white focus:border-[#003b49] outline-none" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-2">CPF do Responsável</label>
+                                            <input type="text" required value={formData.docResponsavel} onChange={e => setFormData({...formData, docResponsavel: e.target.value})} className="w-full p-4 border-2 border-yellow-200 rounded-xl bg-white focus:border-[#003b49] outline-none" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-2">Contato do Responsável</label>
+                                            <input type="text" required value={formData.telefoneResponsavel} onChange={e => setFormData({...formData, telefoneResponsavel: e.target.value})} className="w-full p-4 border-2 border-yellow-200 rounded-xl bg-white focus:border-[#003b49] outline-none" />
+                                        </div>
                                     </div>
                                 </div>
                             )}
 
-                            <button type="submit" disabled={(age !== null && age < 11) || isSaving} className={`w-full py-4 rounded-xl font-black text-xl shadow-xl mt-6 ${(age !== null && age < 11) || isSaving ? 'bg-gray-300 text-gray-500' : 'bg-[#f8b417] text-[#003b49] hover:bg-yellow-400 transition'}`}>
-                                {isSaving ? <i className="fas fa-spinner fa-spin"></i> : "Finalizar Inscrição"}
+                            <button type="submit" disabled={age !== null && age < 11 || loading} className={`w-full py-5 rounded-2xl font-black text-xl text-white transition shadow-lg mt-8 ${age !== null && age < 11 ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#f8b417] hover:bg-yellow-500 text-[#003b49]'}`}>
+                                {loading ? <i className="fas fa-spinner fa-spin"></i> : 'Concluir Cadastro Oficial'}
                             </button>
                         </form>
                     </div>
@@ -424,593 +411,360 @@
 
         function UserDashboard({ user, onLogout, activities }) {
             const [activeTab, setActiveTab] = useState('perfil'); 
-            const [msg, setMsg] = useState(null);
-            const [celebration, setCelebration] = useState(null); 
             const [bookData, setBookData] = useState({ title: '', author: '', year: '' });
-            const [eventCheckinName, setEventCheckinName] = useState('');
-            
-            const [schedulingBookId, setSchedulingBookId] = useState('');
-            const [scheduleDate, setScheduleDate] = useState('');
-            const [scheduleTime, setScheduleTime] = useState('');
+            const [summaryData, setSummaryData] = useState({ bookId: '', date: '', time: '' });
+            const [rating, setRating] = useState(0);
+            const [message, setMessage] = useState({ text: '', type: '' });
+            const [loadingLocation, setLoadingLocation] = useState(false);
+            const cardRef = useRef(null);
 
-            const [isCheckingIn, setIsCheckingIn] = useState(false);
-            
-            const activeLibraryCheckin = activities.find(a => a.userId === user.id && a.type === 'checkin' && a.status === 'active');
-            const activeEventCheckin = activities.find(a => a.userId === user.id && a.type === 'event' && a.status === 'active');
             const userActivities = activities.filter(a => a.userId === user.id);
-            const totalPoints = calculateUserPoints(user.id, activities);
+            const books = userActivities.filter(a => a.type === 'book');
+            const totalPoints = userActivities.reduce((sum, act) => act.status === 'approved' || act.status === 'Lido' || act.status === 'Resumo Aprovado' || act.type === 'checkin_out' || act.type === 'event' ? sum + act.points : sum, 0);
 
-            const showMsg = (text, type) => { setMsg({ text, type }); setTimeout(() => setMsg(null), 5000); };
-            const showCelebrationMsg = (text) => { setCelebration(text); setTimeout(() => setCelebration(null), 5000); };
+            const showMsg = (text, type = 'success') => {
+                setMessage({ text, type });
+                setTimeout(() => setMessage({ text: '', type: '' }), 4000);
+            };
 
-            const downloadCarteirinha = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = 600; canvas.height = 360;
-                const ctx = canvas.getContext('2d');
-
-                ctx.fillStyle = '#003b49'; ctx.fillRect(0, 0, 600, 360);
-                ctx.fillStyle = '#f8b417'; ctx.fillRect(0, 0, 600, 100);
-                ctx.fillStyle = '#ffffff'; ctx.font = 'bold 30px sans-serif'; ctx.fillText('Redes Literárias', 30, 65);
-                ctx.fillStyle = '#f8b417'; ctx.font = 'bold 22px sans-serif'; ctx.fillText('LEITOR OFICIAL', 30, 160);
-                ctx.fillStyle = '#ffffff'; ctx.font = 'bold 34px sans-serif'; ctx.fillText(user.nome.substring(0, 25), 30, 210);
-                ctx.fillStyle = '#cbd5e1'; ctx.font = '20px sans-serif'; ctx.fillText(`Registro: ${user.registro}`, 30, 260);
-                ctx.fillText(`CPF: ${user.documento}`, 30, 290);
-                
-                const drawProfile = (imgObj) => {
-                    ctx.save(); ctx.beginPath(); ctx.arc(480, 200, 80, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
-                    ctx.drawImage(imgObj, 400, 120, 160, 160);
-                    ctx.restore();
-                    ctx.strokeStyle = '#f8b417'; ctx.lineWidth = 6;
-                    ctx.beginPath(); ctx.arc(480, 200, 80, 0, Math.PI * 2); ctx.stroke();
-                    
-                    const link = document.createElement('a'); link.download = `Carteirinha_${user.registro}.png`; link.href = canvas.toDataURL(); link.click();
-                    showMsg('Carteirinha baixada com sucesso!', 'success');
-                };
-
-                const img = new Image(); img.crossOrigin = "Anonymous";
-                img.onload = () => drawProfile(img);
-                img.src = user.foto;
+            const downloadCard = () => {
+                if (cardRef.current) {
+                    html2canvas(cardRef.current, { scale: 2, useCORS: true }).then(canvas => {
+                        const link = document.createElement('a');
+                        link.download = `Carteirinha_${user.nome}.png`;
+                        link.href = canvas.toDataURL();
+                        link.click();
+                    });
+                }
             };
 
             const handleRegisterBook = async (e) => {
                 e.preventDefault();
-                if(!bookData.title || !bookData.author) return;
-                const newActivity = { id: Date.now().toString(), userId: user.id, type: 'book', title: bookData.title, author: bookData.author, year: bookData.year, date: new Date().toISOString(), status: 'reading', points: 10, rating: 0 };
-                
-                await db.collection('activities').doc(newActivity.id).set(newActivity);
+                if(!bookData.title) return;
+                const newActivity = { userId: user.id, type: 'book', ...bookData, status: 'Lendo', date: new Date().toISOString().split('T')[0], points: 0 };
+                await window.fb.addDoc(window.fb.collection(window.db, "activities"), newActivity);
                 setBookData({ title: '', author: '', year: '' });
-                showMsg('Livro registrado! Status: Lendo. Você ganhou 10 pontos.', 'success');
+                showMsg('📚 Livro cadastrado! Boa leitura!');
+                setActiveTab('perfil');
             };
 
-            const updateBookStatus = async (activityId, newStatus) => {
-                await db.collection('activities').doc(activityId).update({ status: newStatus, lastUpdate: new Date().toISOString() });
-                if (newStatus === 'read') showCelebrationMsg("Parabéns! Você concluiu mais uma leitura! 🎉");
-                else showMsg(`Status atualizado para: ${newStatus}`, 'success');
+            const markAsRead = async (book) => {
+                if (rating === 0) { showMsg('Dê uma nota de 1 a 5 estrelas antes de concluir.', 'error'); return; }
+                const actRef = window.fb.doc(window.db, "activities", book.dbId);
+                await window.fb.updateDoc(actRef, { status: 'Lido', rating: rating, points: 10 });
+                setRating(0);
+                showMsg('Parabéns por concluir mais um livro! +10 pontos na sua conta! 🌟');
             };
 
-            const handleRateBook = async (activityId, star) => {
-                await db.collection('activities').doc(activityId).update({ rating: star });
-            };
-
-            const confirmSchedule = async (e) => {
+            const handleScheduleSummary = async (e) => {
                 e.preventDefault();
-                if(!scheduleDate || !scheduleTime || !schedulingBookId) return;
+                if(!summaryData.bookId) { showMsg('Selecione um livro lido.', 'error'); return; }
+                const d = new Date(summaryData.date);
+                if (d.getUTCDay() < 2 || d.getUTCDay() > 4) { showMsg('Apenas Terça a Quinta.', 'error'); return; }
                 
-                await db.collection('activities').doc(schedulingBookId).update({ status: 'schedule_pending', scheduleDate, scheduleTime, lastUpdate: new Date().toISOString() });
-                
-                setSchedulingBookId(''); setScheduleDate(''); setScheduleTime('');
-                setActiveTab('leituras');
-                showMsg('Solicitação enviada! Aguarde o Administrador confirmar o seu agendamento.', 'success');
+                const actRef = window.fb.doc(window.db, "activities", summaryData.bookId);
+                await window.fb.updateDoc(actRef, { status: 'Resumo Agendado', summaryDate: summaryData.date, summaryTime: summaryData.time });
+                setSummaryData({ bookId: '', date: '', time: '' });
+                showMsg('Agendamento enviado para aprovação da Biblioteca! Aguarde.');
+                setActiveTab('perfil');
             };
 
-            const handleCheckInLibrary = () => {
-                setIsCheckingIn(true);
-                if ("geolocation" in navigator) {
-                    navigator.geolocation.getCurrentPosition(async (position) => {
-                        const { latitude, longitude } = position.coords;
-                        const libraryLat = -9.62; const libraryLng = -42.08;
-                        const R = 6371;
-                        const dLat = (latitude - libraryLat) * Math.PI / 180;
-                        const dLon = (longitude - libraryLng) * Math.PI / 180;
-                        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(libraryLat * Math.PI / 180) * Math.cos(latitude * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-                        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                        const distance = R * c;
+            // Cálculo de Checkin Geográfico
+            const calcDistance = (lat1, lon1, lat2, lon2) => {
+                const R = 6371; const dLat = (lat2-lat1)*(Math.PI/180); const dLon = (lon2-lon1)*(Math.PI/180);
+                const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*(Math.PI/180))*Math.cos(lat2*(Math.PI/180))*Math.sin(dLon/2)*Math.sin(dLon/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                return R * c;
+            };
 
-                        if (distance <= 1) { // 1km tolerance
-                            const newAct = { id: Date.now().toString(), userId: user.id, type: 'checkin', status: 'active', checkInTime: new Date().toISOString(), date: new Date().toISOString().split('T')[0] };
-                            await db.collection('activities').doc(newAct.id).set(newAct);
-                            showMsg(`Check-in na biblioteca realizado!`, 'success');
+            const handleCheckIn = () => {
+                setLoadingLocation(true);
+                if(navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(async (pos) => {
+                        const dist = calcDistance(-9.62, -42.08, pos.coords.latitude, pos.coords.longitude);
+                        if (dist <= 1.0) { // 1km radius
+                            const newCheckin = { userId: user.id, type: 'checkin', checkinTime: new Date().toISOString(), status: 'active' };
+                            await window.fb.addDoc(window.fb.collection(window.db, "activities"), newCheckin);
+                            showMsg('Check-in realizado! Boa leitura na biblioteca.');
                         } else {
-                            showMsg('Você não está próximo à biblioteca.', 'error');
+                            showMsg('Você precisa estar próximo à Biblioteca para o check-in.', 'error');
                         }
-                        setIsCheckingIn(false);
-                    }, (error) => {
-                        showMsg('Erro ao obter localização. Permita o acesso ao GPS.', 'error');
-                        setIsCheckingIn(false);
-                    });
-                } else {
-                    showMsg('Geolocalização não suportada no seu navegador.', 'error');
-                    setIsCheckingIn(false);
+                        setLoadingLocation(false);
+                    }, () => { showMsg('Ative o GPS para o check-in.', 'error'); setLoadingLocation(false); });
                 }
             };
 
-            const handleCheckOutLibrary = async () => {
-                if(!activeLibraryCheckin) return;
-                const diffMinutes = Math.floor(Math.abs(new Date() - new Date(activeLibraryCheckin.checkInTime)) / 60000);
-                const earned = calcVisitPoints(diffMinutes);
+            const handleCheckOut = async (checkinRecord) => {
+                const outTime = new Date();
+                const inTime = new Date(checkinRecord.checkinTime);
+                const diffMins = Math.round((outTime - inTime) / 60000);
                 
-                await db.collection('activities').doc(activeLibraryCheckin.id).update({ status: 'completed', checkOutTime: new Date().toISOString(), points: earned });
-                
-                if (earned === 0) showMsg(`Check-out. Você ficou menos de 20 minutos e não pontuou desta vez.`, 'error');
-                else showMsg(`Check-out realizado! Você ganhou ${earned} pontos.`, 'success');
+                let pts = 0;
+                if (diffMins >= 60) pts = 3 + Math.floor((diffMins - 60) / 20) * 1;
+                else if (diffMins >= 40) pts = 2;
+                else if (diffMins >= 30) pts = 1;
+                else if (diffMins >= 20) pts = 0.5;
+
+                const actRef = window.fb.doc(window.db, "activities", checkinRecord.dbId);
+                await window.fb.updateDoc(actRef, { type: 'checkin_out', checkoutTime: outTime.toISOString(), durationMins: diffMins, points: pts, status: 'completed' });
+                showMsg(`Check-out concluído! Tempo: ${diffMins} min. Pontos ganhos: ${pts}.`);
             };
 
-            const handleCheckInEvent = async (e) => {
-                e.preventDefault();
-                if(!eventCheckinName) return;
-                const newAct = { id: Date.now().toString(), userId: user.id, type: 'event', title: eventCheckinName, status: 'active', checkInTime: new Date().toISOString(), date: new Date().toISOString().split('T')[0] };
-                await db.collection('activities').doc(newAct.id).set(newAct);
-                setEventCheckinName(''); showMsg(`Check-in no Evento realizado!`, 'success');
-            };
-
-            const handleCheckOutEvent = async () => {
-                if(!activeEventCheckin) return;
-                await db.collection('activities').doc(activeEventCheckin.id).update({ status: 'completed', checkOutTime: new Date().toISOString(), points: 30 });
-                showCelebrationMsg(`Incrível! Presença no evento confirmada! +30 pts 🎉`);
-            };
+            const activeCheckin = userActivities.find(a => a.type === 'checkin' && a.status === 'active');
 
             return (
-                <div className="min-h-screen bg-gray-50 pb-10">
-                    <header className="bg-[#003b49] text-white p-4 shadow-lg sticky top-0 z-40 border-b-4 border-[#f8b417]">
-                        <div className="max-w-5xl mx-auto flex justify-between items-center">
+                <div className="min-h-screen bg-gray-100 pb-10 font-sans text-gray-800">
+                    <header className="bg-[#003b49] text-white p-4 shadow-lg sticky top-0 z-50">
+                        <div className="max-w-4xl mx-auto flex justify-between items-center">
                             <div className="flex items-center gap-3">
-                                <img src="Redes%20liter%C3%A1rias_Biblioteca%20(1).png" className="w-12 h-12 bg-white rounded-full p-1" onError={(e)=>{e.target.style.display='none'}} />
-                                <div><h1 className="font-black text-xl">Área do Leitor</h1></div>
+                                <img src="Redes literárias_Biblioteca (1).png" alt="Logo" className="w-12 h-12 bg-white rounded-full p-1 border-2 border-yellow-400" />
+                                <div><h1 className="font-bold text-lg leading-tight">Redes Literárias</h1><p className="text-yellow-400 text-sm">Painel do Leitor</p></div>
                             </div>
-                            <button onClick={onLogout} className="bg-red-500 px-4 py-2 rounded-xl text-sm font-bold shadow hover:bg-red-600"><i className="fas fa-sign-out-alt"></i> Sair</button>
+                            <button onClick={onLogout} className="text-sm font-bold bg-white text-[#003b49] px-4 py-2 rounded-lg hover:bg-gray-200"><i className="fas fa-sign-out-alt mr-1"></i> Sair</button>
                         </div>
                     </header>
 
-                    <main className="max-w-5xl mx-auto mt-6 px-4">
-                        {msg && <div className={`p-4 mb-6 rounded-2xl font-bold shadow-md flex items-center border-l-4 ${msg.type === 'success' ? 'bg-green-100 text-green-800 border-green-500' : 'bg-red-100 text-red-800 border-red-500'}`}><i className={`fas mr-3 text-2xl ${msg.type==='success'?'fa-check-circle':'fa-exclamation-circle'}`}></i> {msg.text}</div>}
-
-                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                            <div className="lg:col-span-1 space-y-6">
-                                <div className="bg-white rounded-[2rem] shadow-lg p-6 text-center border border-gray-100 relative overflow-hidden">
-                                    <div className="h-20 bg-[#f8b417] absolute top-0 left-0 w-full rounded-b-3xl"></div>
-                                    <img src={user.foto} className="w-32 h-32 mx-auto rounded-full border-4 border-white shadow-xl relative z-10 object-cover bg-gray-200 mt-4" />
-                                    <h2 className="font-black text-xl mt-4 text-[#003b49]">{user.nome}</h2>
-                                    <p className="text-sm font-bold text-gray-500 bg-gray-100 py-1 px-3 rounded-lg inline-block mt-2">Reg: {user.registro}</p>
-                                    <button onClick={downloadCarteirinha} className="w-full mt-4 bg-gray-900 text-white font-bold py-2 rounded-xl text-sm hover:bg-gray-800 shadow"><i className="fas fa-id-card mr-2"></i>Baixar Carteirinha</button>
-                                    
-                                    <div className="mt-6 bg-blue-50 border border-blue-100 rounded-2xl p-4 shadow-inner">
-                                        <p className="text-xs font-black uppercase text-blue-800 tracking-widest mb-1">Pontuação Total</p>
-                                        <p className="text-5xl font-black text-[#003b49]">{totalPoints}</p>
+                    <main className="max-w-4xl mx-auto mt-6 px-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            
+                            <div className="md:col-span-1 space-y-6">
+                                {/* Carteirinha de Identificação */}
+                                <div ref={cardRef} className="bg-gradient-to-b from-[#003b49] to-gray-900 rounded-3xl shadow-xl overflow-hidden relative border-4 border-white">
+                                    <div className="bg-[#f8b417] h-24 w-full absolute top-0 left-0 z-0 rounded-b-[50px] shadow-md"></div>
+                                    <div className="relative z-10 p-6 flex flex-col items-center pt-8">
+                                        <img src={user.foto} className="w-28 h-28 rounded-full border-4 border-white shadow-xl object-cover bg-gray-100" />
+                                        <h2 className="mt-4 font-black text-xl text-center text-white leading-tight uppercase">{user.nome}</h2>
+                                        <div className="bg-white text-[#003b49] px-4 py-1.5 rounded-full text-sm font-black mt-3 shadow-md tracking-widest">{user.registro}</div>
+                                        <div className="w-full mt-6 bg-white/10 rounded-xl p-4 text-center border border-white/20">
+                                            <p className="text-gray-300 text-xs font-bold uppercase tracking-wide mb-1">Pontuação Total</p>
+                                            <p className="font-black text-3xl text-yellow-400">{totalPoints} <span className="text-sm">pts</span></p>
+                                        </div>
                                     </div>
                                 </div>
-
-                                <div className="bg-gradient-to-br from-indigo-800 to-blue-900 rounded-[2rem] p-6 text-white shadow-lg text-center relative overflow-hidden">
-                                    <i className="fas fa-book-reader absolute -right-4 -bottom-4 text-8xl opacity-10"></i>
-                                    <h3 className="font-black text-lg mb-2 text-indigo-200">Visita à Biblioteca</h3>
-                                    <p className="text-xs text-blue-100 mb-5 leading-relaxed">20m = 0.5pt | 30m = 1pt | 40m = 2pts | 1h = 3pts</p>
-                                    {activeLibraryCheckin ? (
-                                        <div className="space-y-3">
-                                            <div className="bg-white bg-opacity-20 rounded-xl p-3 text-sm font-bold animate-pulse"><i className="fas fa-clock mr-2"></i> Visita Ativa</div>
-                                            <button onClick={handleCheckOutLibrary} className="w-full bg-red-500 text-white font-black py-3 rounded-xl hover:bg-red-600 shadow-lg">Fazer Check-out</button>
-                                        </div>
-                                    ) : (
-                                        <button onClick={handleCheckInLibrary} disabled={isCheckingIn} className="w-full bg-[#f8b417] text-[#003b49] font-black py-3 rounded-xl hover:bg-yellow-400 shadow-lg">
-                                            {isCheckingIn ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-sign-in-alt mr-2"></i> Check-in Leitura</>}
-                                        </button>
-                                    )}
-                                </div>
-
-                                <div className="bg-gradient-to-br from-purple-800 to-pink-900 rounded-[2rem] p-6 text-white shadow-lg text-center relative overflow-hidden">
-                                    <i className="fas fa-star absolute -right-4 -bottom-4 text-8xl opacity-10"></i>
-                                    <h3 className="font-black text-lg mb-2 text-pink-200">Participação em Eventos</h3>
-                                    <p className="text-xs text-pink-100 mb-5 leading-relaxed">Participe e garanta +30 pontos</p>
-                                    {activeEventCheckin ? (
-                                        <div className="space-y-3">
-                                            <div className="bg-white bg-opacity-20 rounded-xl p-3 text-xs font-bold animate-pulse break-words"><i className="fas fa-calendar-check mr-2"></i> Evento: {activeEventCheckin.title}</div>
-                                            <button onClick={handleCheckOutEvent} className="w-full bg-red-500 text-white font-black py-3 rounded-xl hover:bg-red-600 shadow-lg">Finalizar Evento (+30pts)</button>
-                                        </div>
-                                    ) : (
-                                        <form onSubmit={handleCheckInEvent} className="space-y-3">
-                                            <input required type="text" placeholder="Nome do Evento" value={eventCheckinName} onChange={e=>setEventCheckinName(e.target.value)} className="w-full p-3 rounded-xl border-none text-gray-900 text-sm font-bold focus:ring-2 focus:ring-pink-400" />
-                                            <button type="submit" className="w-full bg-pink-500 text-white font-black py-3 rounded-xl hover:bg-pink-400 shadow-lg"><i className="fas fa-calendar-plus mr-2"></i> Iniciar Evento</button>
-                                        </form>
-                                    )}
-                                </div>
+                                <button onClick={downloadCard} className="w-full bg-white border-2 border-[#003b49] text-[#003b49] font-bold py-3 rounded-xl hover:bg-gray-50 transition shadow-sm"><i className="fas fa-download mr-2"></i> Baixar Carteirinha</button>
                             </div>
 
-                            <div className="lg:col-span-3 space-y-6">
-                                <div className="bg-white rounded-2xl shadow-sm p-2 flex gap-2 overflow-x-auto border border-gray-200">
-                                    <button onClick={() => setActiveTab('perfil')} className={`flex-1 py-3 px-4 min-w-[120px] rounded-xl font-black text-sm transition ${activeTab === 'perfil' ? 'bg-[#003b49] text-white' : 'text-gray-500 hover:bg-gray-100'}`}><i className="fas fa-list-ul mr-2"></i> Histórico</button>
-                                    <button onClick={() => setActiveTab('leituras')} className={`flex-1 py-3 px-4 min-w-[120px] rounded-xl font-black text-sm transition ${activeTab === 'leituras' ? 'bg-[#003b49] text-white' : 'text-gray-500 hover:bg-gray-100'}`}><i className="fas fa-book-open mr-2"></i> Minhas Leituras</button>
-                                    <button onClick={() => setActiveTab('agendar')} className={`flex-1 py-3 px-4 min-w-[120px] rounded-xl font-black text-sm transition ${activeTab === 'agendar' ? 'bg-orange-500 text-white' : 'text-gray-500 hover:bg-gray-100'}`}><i className="fas fa-calendar-alt mr-2"></i> Agendar Resumo</button>
+                            <div className="md:col-span-2 space-y-6">
+                                <div className="bg-white rounded-2xl shadow-sm p-2 flex gap-1 overflow-x-auto hide-scrollbar border border-gray-200">
+                                    <button onClick={() => setActiveTab('perfil')} className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm whitespace-nowrap transition ${activeTab === 'perfil' ? 'bg-[#003b49] text-white shadow-md' : 'text-gray-500 hover:bg-gray-100'}`}><i className="fas fa-history mr-2"></i> Histórico</button>
+                                    <button onClick={() => setActiveTab('livro')} className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm whitespace-nowrap transition ${activeTab === 'livro' ? 'bg-[#003b49] text-white shadow-md' : 'text-gray-500 hover:bg-gray-100'}`}><i className="fas fa-book-open mr-2"></i> Cadastrar Livro</button>
+                                    <button onClick={() => setActiveTab('resumo')} className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm whitespace-nowrap transition ${activeTab === 'resumo' ? 'bg-[#f8b417] text-[#003b49] shadow-md' : 'text-gray-500 hover:bg-gray-100'}`}><i className="fas fa-edit mr-2"></i> Agendar Resumo</button>
+                                    <button onClick={() => setActiveTab('checkin')} className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm whitespace-nowrap transition ${activeTab === 'checkin' ? 'bg-[#003b49] text-white shadow-md' : 'text-gray-500 hover:bg-gray-100'}`}><i className="fas fa-map-marker-alt mr-2"></i> Check-in Biblio.</button>
                                 </div>
 
+                                {message.text && <div className={`p-4 rounded-xl font-bold shadow-sm border-l-4 ${message.type === 'success' ? 'bg-green-50 text-green-700 border-green-500' : 'bg-red-50 text-red-700 border-red-500'}`}><i className={`fas ${message.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2`}></i> {message.text}</div>}
+
                                 {activeTab === 'perfil' && (
-                                    <div className="bg-white rounded-[2rem] shadow-lg p-6 border border-gray-100 min-h-[400px]">
-                                        <h3 className="font-black text-2xl text-[#003b49] mb-6 border-b pb-4">Timeline de Atividades</h3>
-                                        {userActivities.length === 0 ? <p className="text-gray-400 text-center py-10 font-bold">Nenhuma atividade registrada.</p> : (
-                                            <div className="space-y-4">
-                                                {userActivities.slice().reverse().map(act => (
-                                                    <div key={act.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                                        <div className="flex items-center gap-4">
-                                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white ${act.type==='book'?'bg-blue-500':act.type==='checkin'?'bg-indigo-500':act.type==='event'?'bg-pink-500':act.type==='penalty'?'bg-red-500':'bg-green-500'}`}>
-                                                                <i className={`fas ${act.type==='book'?'fa-book':act.type==='checkin'?'fa-map-marker-alt':act.type==='event'?'fa-star':act.type==='penalty'?'fa-ban':'fa-check'}`}></i>
-                                                            </div>
-                                                            <div>
-                                                                <p className="font-bold text-gray-800">{act.title || (act.type === 'checkin' ? 'Visita à Biblioteca' : 'Infração')}</p>
-                                                                <p className="text-xs text-gray-500 font-bold">{new Date(act.date || act.checkInTime).toLocaleDateString()}</p>
-                                                            </div>
+                                    <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+                                        <h3 className="font-black text-xl text-[#003b49] mb-6 flex items-center"><i className="fas fa-stream mr-3"></i> Suas Atividades</h3>
+                                        <div className="space-y-4">
+                                            {books.map(b => (
+                                                <div key={b.dbId} className="border-2 border-gray-100 rounded-xl p-4 hover:border-blue-200 transition">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <h4 className="font-bold text-lg text-gray-800">{b.title}</h4>
+                                                            <p className="text-sm text-gray-500">{b.author} • {b.year}</p>
+                                                            <div className="mt-2 inline-flex items-center text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">Status: {b.status}</div>
+                                                            {b.rating && <div className="mt-2 text-yellow-400 text-sm">{"★".repeat(b.rating)}{"☆".repeat(5-b.rating)}</div>}
                                                         </div>
                                                         <div className="text-right">
-                                                            {act.type === 'penalty' ? <span className="text-red-600 font-black px-3 py-1 bg-red-100 rounded-lg">-{act.pointsDeducted} pts</span> : 
-                                                             act.status === 'active' ? <span className="text-indigo-600 font-bold px-3 py-1 bg-indigo-100 rounded-lg">Em andamento</span> :
-                                                             <span className="text-green-600 font-black px-3 py-1 bg-green-100 rounded-lg">+{act.points} pts</span>}
+                                                            {b.status === 'Lendo' && (
+                                                                <div className="flex flex-col items-end gap-2">
+                                                                    <div className="flex gap-1 text-2xl text-gray-300">
+                                                                        {[1,2,3,4,5].map(star => <i key={star} onClick={() => setRating(star)} className={`fas fa-star cursor-pointer hover:text-yellow-400 ${rating >= star ? 'text-yellow-400' : ''}`}></i>)}
+                                                                    </div>
+                                                                    <button onClick={() => markAsRead(b)} className="bg-green-500 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-green-600">Marcar como Lido</button>
+                                                                </div>
+                                                            )}
+                                                            {b.status === 'Lido' && <button onClick={() => setActiveTab('resumo')} className="bg-[#f8b417] text-[#003b49] text-xs font-bold px-3 py-2 rounded-lg hover:bg-yellow-500">Agendar Resumo</button>}
                                                         </div>
                                                     </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {activeTab === 'leituras' && (
-                                    <div className="bg-white rounded-[2rem] shadow-lg p-6 border border-gray-100 min-h-[400px]">
-                                        <div className="bg-blue-50 p-6 rounded-3xl mb-8 border border-blue-100">
-                                            <h3 className="font-black text-xl text-[#003b49] mb-4">Adicionar Nova Leitura</h3>
-                                            <form onSubmit={handleRegisterBook} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                <input required type="text" placeholder="Título do Livro" value={bookData.title} onChange={e=>setBookData({...bookData, title:e.target.value})} className="p-3 rounded-xl border focus:ring-2 focus:ring-[#003b49]" />
-                                                <input required type="text" placeholder="Autor" value={bookData.author} onChange={e=>setBookData({...bookData, author:e.target.value})} className="p-3 rounded-xl border focus:ring-2 focus:ring-[#003b49]" />
-                                                <div className="flex gap-2">
-                                                    <input type="number" placeholder="Ano" value={bookData.year} onChange={e=>setBookData({...bookData, year:e.target.value})} className="p-3 rounded-xl border focus:ring-2 focus:ring-[#003b49] w-24" />
-                                                    <button type="submit" className="flex-1 bg-[#003b49] text-white font-bold rounded-xl hover:bg-gray-800 transition">Salvar (+10 pts)</button>
                                                 </div>
-                                            </form>
-                                        </div>
-
-                                        <h3 className="font-black text-xl text-[#003b49] mb-4">Livros na Estante</h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {userActivities.filter(a => a.type === 'book').reverse().map(book => (
-                                                <div key={book.id} className="p-5 border-2 border-gray-100 rounded-2xl relative group bg-white shadow-sm hover:shadow-md transition">
-                                                    <h4 className="font-black text-lg text-gray-800 leading-tight pr-8">{book.title}</h4>
-                                                    <p className="text-sm text-gray-500 mb-3">{book.author} {book.year ? `(${book.year})` : ''}</p>
-                                                    
-                                                    <div className="flex items-center mb-4 bg-gray-50 p-2 rounded-xl inline-flex">
-                                                        <span className="text-xs font-bold text-gray-400 mr-2 uppercase">Sua Nota:</span>
-                                                        <div className="flex gap-1">
-                                                            {[1,2,3,4,5].map(star => (
-                                                                <i key={star} onClick={() => handleRateBook(book.id, star)} className={`fas fa-star cursor-pointer transition-colors text-lg ${book.rating >= star ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-200'}`}></i>
-                                                            ))}
-                                                        </div>
+                                            ))}
+                                            {userActivities.filter(a => a.type !== 'book').map(act => (
+                                                <div key={act.dbId} className="border border-gray-100 rounded-xl p-4 bg-gray-50 flex justify-between items-center">
+                                                    <div>
+                                                        <p className="font-bold text-gray-700">{act.type === 'checkin_out' ? 'Estudo na Biblioteca' : act.title || act.type}</p>
+                                                        <p className="text-xs text-gray-500">{new Date(act.checkoutTime || act.date || act.createdAt).toLocaleDateString('pt-BR')}</p>
                                                     </div>
-                                                    
-                                                    <div className="bg-gray-50 p-3 rounded-xl mt-2 border border-gray-100">
-                                                        <p className="text-xs font-bold text-gray-400 mb-2 uppercase">Status Atual:</p>
-                                                        {book.status === 'reading' && (
-                                                            <div className="flex gap-2">
-                                                                <span className="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm font-bold flex-1 text-center">Lendo</span>
-                                                                <button onClick={() => updateBookStatus(book.id, 'read')} className="bg-green-500 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-green-600 shadow-sm"><i className="fas fa-check mr-1"></i> Marcar Lido</button>
-                                                            </div>
-                                                        )}
-                                                        {book.status === 'read' && (
-                                                            <div className="flex flex-col gap-2">
-                                                                <span className="bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-bold text-center">Livro Lido</span>
-                                                                <button onClick={() => { setActiveTab('agendar'); setSchedulingBookId(book.id); }} className="bg-orange-500 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-orange-600 shadow-sm"><i className="fas fa-calendar-alt mr-2"></i>Agendar Entrega de Resumo</button>
-                                                            </div>
-                                                        )}
-                                                        {book.status === 'schedule_pending' && (
-                                                            <span className="block w-full bg-yellow-100 text-yellow-800 px-3 py-2 rounded-lg text-sm font-bold text-center"><i className="fas fa-hourglass-half mr-1"></i> Agendamento em análise ({book.scheduleDate?.split('-').reverse().join('/')} às {book.scheduleTime})</span>
-                                                        )}
-                                                        {book.status === 'schedule_approved' && (
-                                                            <span className="block w-full bg-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-bold text-center"><i className="fas fa-calendar-check mr-1"></i> Resumo Agendado ({book.scheduleDate?.split('-').reverse().join('/')} às {book.scheduleTime})</span>
-                                                        )}
-                                                        {book.status === 'summary_approved' && (
-                                                            <span className="block w-full bg-green-100 text-green-700 px-3 py-2 rounded-lg text-sm font-bold text-center"><i className="fas fa-check-double mr-1"></i> Resumo Aprovado (+50 pts)</span>
-                                                        )}
-                                                    </div>
+                                                    <span className="font-black text-green-600 bg-green-100 px-3 py-1 rounded-lg">+{act.points || 0} pts</span>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
                                 )}
 
-                                {activeTab === 'agendar' && (
-                                    <div className="bg-white rounded-[2rem] shadow-lg p-6 border border-gray-100 min-h-[400px]">
-                                        <h3 className="font-black text-2xl text-[#003b49] mb-4 border-b pb-4">Agendar Entrega de Resumo</h3>
-                                        
-                                        <div className="bg-orange-50 p-6 rounded-2xl mb-6 border-l-4 border-orange-500 shadow-sm">
-                                            <p className="text-orange-900 font-bold text-lg mb-2"><i className="fas fa-exclamation-circle mr-2"></i>Aviso Importante</p>
-                                            <p className="text-sm text-orange-800 font-medium leading-relaxed">
-                                                O resumo é entregue <strong>presencialmente sem consulta</strong> na biblioteca municipal Dr. Délio Ledoux mediante agendamento prévio.
-                                                <br/><br/>Dias de atendimento: <strong>Terça a Quinta-feira, das 09h às 17h30</strong>.
-                                            </p>
-                                        </div>
-                                        
-                                        {userActivities.filter(a => a.type === 'book' && a.status === 'read').length === 0 ? (
-                                            <div className="text-center py-10">
-                                                <i className="fas fa-book-open fa-3x text-gray-300 mb-4"></i>
-                                                <p className="text-gray-500 font-bold text-lg">Nenhum livro aguardando agendamento.</p>
-                                                <p className="text-sm text-gray-400 mt-2">Termine uma leitura, vá na aba "Minhas Leituras" e marque como "Lido" para agendar.</p>
+                                {activeTab === 'livro' && (
+                                    <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+                                        <h3 className="font-black text-xl text-[#003b49] mb-2"><i className="fas fa-plus-circle mr-2"></i> Iniciar Leitura</h3>
+                                        <p className="text-gray-500 font-medium mb-6">Cadastre o livro que vai ler. Pode ser da biblioteca ou seu próprio.</p>
+                                        <form onSubmit={handleRegisterBook} className="space-y-5">
+                                            <div><label className="block text-sm font-bold text-gray-700 mb-2">Título da Obra</label><input type="text" required value={bookData.title} onChange={e => setBookData({...bookData, title: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl bg-gray-50 outline-none focus:border-[#003b49]" /></div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div><label className="block text-sm font-bold text-gray-700 mb-2">Autor</label><input type="text" required value={bookData.author} onChange={e => setBookData({...bookData, author: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl bg-gray-50 outline-none focus:border-[#003b49]" /></div>
+                                                <div><label className="block text-sm font-bold text-gray-700 mb-2">Ano / Edição</label><input type="text" value={bookData.year} onChange={e => setBookData({...bookData, year: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl bg-gray-50 outline-none focus:border-[#003b49]" /></div>
                                             </div>
+                                            <button type="submit" className="w-full bg-[#003b49] text-white font-black py-4 rounded-xl hover:bg-gray-800 transition shadow-lg text-lg mt-4">Salvar e Começar a Ler</button>
+                                        </form>
+                                    </div>
+                                )}
+
+                                {activeTab === 'resumo' && (
+                                    <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+                                        <h3 className="font-black text-xl text-[#003b49] mb-4"><i className="fas fa-calendar-check mr-2"></i> Agendar Entrega de Resumo</h3>
+                                        <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-xl mb-6 text-orange-800 font-medium text-sm">
+                                            <strong>AVISO OFICIAL:</strong> O resumo é escrito presencialmente, sem consulta, na Biblioteca Municipal Dr. Délio Ledoux. 
+                                            <br/>Agendamentos: <strong>Terça a Quinta, das 9h às 17:30h</strong>. Vale muitos pontos!
+                                        </div>
+                                        <form onSubmit={handleScheduleSummary} className="space-y-5">
+                                            <div>
+                                                <label className="block text-sm font-bold text-gray-700 mb-2">Qual livro você leu?</label>
+                                                <select required value={summaryData.bookId} onChange={e => setSummaryData({...summaryData, bookId: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl bg-gray-50 outline-none focus:border-[#003b49] font-medium">
+                                                    <option value="">Selecione um livro com status LIDO</option>
+                                                    {books.filter(b => b.status === 'Lido').map(b => <option key={b.dbId} value={b.dbId}>{b.title}</option>)}
+                                                </select>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div><label className="block text-sm font-bold text-gray-700 mb-2">Data Desejada</label><input type="date" required value={summaryData.date} onChange={e => setSummaryData({...summaryData, date: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl bg-gray-50 outline-none focus:border-[#003b49]" /></div>
+                                                <div><label className="block text-sm font-bold text-gray-700 mb-2">Horário</label><input type="time" required value={summaryData.time} onChange={e => setSummaryData({...summaryData, time: e.target.value})} min="09:00" max="17:30" className="w-full p-4 border-2 border-gray-200 rounded-xl bg-gray-50 outline-none focus:border-[#003b49]" /></div>
+                                            </div>
+                                            <button type="submit" className="w-full bg-[#f8b417] text-[#003b49] font-black py-4 rounded-xl hover:bg-yellow-500 transition shadow-lg text-lg mt-4">Enviar Pedido para a Biblioteca</button>
+                                        </form>
+                                    </div>
+                                )}
+
+                                {activeTab === 'checkin' && (
+                                    <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200 text-center">
+                                        <h3 className="font-black text-xl text-[#003b49] mb-4">Check-in de Estudo e Eventos</h3>
+                                        <p className="text-gray-500 font-medium mb-8">Ganhe pontos por ler presencialmente na biblioteca. O GPS verificará sua localização (Raio de 1km).</p>
+                                        
+                                        {!activeCheckin ? (
+                                            <button onClick={handleCheckIn} disabled={loadingLocation} className="bg-[#003b49] text-white w-48 h-48 rounded-full shadow-2xl font-black text-2xl hover:scale-105 transition flex flex-col items-center justify-center mx-auto border-8 border-blue-100">
+                                                {loadingLocation ? <i className="fas fa-spinner fa-spin mb-2"></i> : <i className="fas fa-map-marker-alt mb-2 text-4xl text-[#f8b417]"></i>}
+                                                {loadingLocation ? 'Buscando...' : 'Fazer Check-in'}
+                                            </button>
                                         ) : (
-                                            <form onSubmit={confirmSchedule} className="space-y-4 max-w-md">
-                                                <div>
-                                                    <label className="block text-sm font-bold mb-1">Selecione o Livro Lido</label>
-                                                    <select required value={schedulingBookId} onChange={e => setSchedulingBookId(e.target.value)} className="w-full p-3 border rounded-xl bg-gray-50">
-                                                        <option value="">Escolha um livro...</option>
-                                                        {userActivities.filter(a => a.type === 'book' && a.status === 'read').map(b => (
-                                                            <option key={b.id} value={b.id}>{b.title} - {b.author}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-bold mb-1">Data Desejada</label>
-                                                    <input required type="date" min={new Date().toISOString().split('T')[0]} value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} className="w-full p-3 border rounded-xl bg-gray-50" />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-bold mb-1">Horário (09:00 às 17:30)</label>
-                                                    <input required type="time" min="09:00" max="17:30" value={scheduleTime} onChange={e=>setScheduleTime(e.target.value)} className="w-full p-3 border rounded-xl bg-gray-50" />
-                                                </div>
-                                                <button type="submit" disabled={!scheduleDate || !scheduleTime || !schedulingBookId} className="w-full bg-orange-500 text-white font-black py-4 rounded-xl mt-4 shadow-lg hover:bg-orange-600 disabled:opacity-50">Enviar Solicitação de Agendamento</button>
-                                            </form>
+                                            <div className="bg-green-50 p-8 rounded-3xl border-2 border-green-200">
+                                                <i className="fas fa-clock fa-3x text-green-500 mb-4 animate-pulse"></i>
+                                                <h4 className="font-black text-xl text-green-800 mb-2">Tempo Contando...</h4>
+                                                <p className="text-green-700 font-medium mb-6">Você entrou às {new Date(activeCheckin.checkinTime).toLocaleTimeString('pt-BR')}</p>
+                                                <button onClick={() => handleCheckOut(activeCheckin)} className="bg-red-600 text-white font-black py-4 px-10 rounded-xl shadow-lg hover:bg-red-700 text-lg"><i className="fas fa-sign-out-alt mr-2"></i> Fazer Check-out e Salvar Pontos</button>
+                                            </div>
                                         )}
+                                        <div className="mt-8 grid grid-cols-4 gap-2 text-xs font-bold text-gray-500">
+                                            <div className="bg-gray-50 p-2 rounded">20min = 0.5pt</div>
+                                            <div className="bg-gray-50 p-2 rounded">30min = 1.0pt</div>
+                                            <div className="bg-gray-50 p-2 rounded">40min = 2.0pt</div>
+                                            <div className="bg-gray-50 p-2 rounded">60min = 3.0pt</div>
+                                        </div>
                                     </div>
                                 )}
                             </div>
                         </div>
-
-                        {celebration && (
-                            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
-                                <div className="bg-white rounded-[2rem] shadow-2xl p-8 max-w-sm w-full text-center animate-pop-in border-4 border-[#f8b417]">
-                                    <div className="text-6xl mb-4">🎉</div>
-                                    <h3 className="font-black text-2xl text-[#003b49] mb-2">Parabéns!</h3>
-                                    <p className="font-bold text-gray-600 text-lg">{celebration}</p>
-                                    <button onClick={() => setCelebration(null)} className="mt-6 w-full bg-[#f8b417] text-[#003b49] font-black py-3 rounded-xl hover:bg-yellow-400 shadow-md">Show!</button>
-                                </div>
-                            </div>
-                        )}
                     </main>
                 </div>
             );
         }
 
         function AdminDashboard({ onLogout, users, activities }) {
-            const [activeTab, setActiveTab] = useState('leituras'); 
-            const [msg, setMsg] = useState(null);
-            const [celebration, setCelebration] = useState(null);
+            const [activeTab, setActiveTab] = useState('resumos'); 
+            const [message, setMessage] = useState({ text: '', type: '' });
+            const [infracaoData, setInfracaoData] = useState({ userId: '', motivo: '', pontos: '' });
+
+            const showMsg = (text, type = 'success') => {
+                setMessage({ text, type });
+                setTimeout(() => setMessage({ text: '', type: '' }), 4000);
+            };
+
+            const getUserInfo = (id) => users.find(u => u.id === id);
+
+            const pendingBooks = activities.filter(a => a.status === 'Resumo Agendado');
+            const allBooks = activities.filter(a => a.type === 'book');
             
-            const [editingUser, setEditingUser] = useState(null);
-            const [penalizingUser, setPenalizingUser] = useState(null);
-            const [penaltyData, setPenaltyData] = useState({ reason: '', points: 10 });
-
-            const showMsg = (text, type) => { setMsg({ text, type }); setTimeout(() => setMsg(null), 4000); };
-            const showCelebrationMsg = (text) => { setCelebration(text); setTimeout(() => setCelebration(null), 5000); };
-
-            const pendingSchedules = activities.filter(a => a.type === 'book' && a.status === 'schedule_pending');
-            const approvedSchedules = activities.filter(a => a.type === 'book' && a.status === 'schedule_approved');
-            
-            const handleApproveSchedule = async (activityId) => {
-                await db.collection('activities').doc(activityId).update({ status: 'schedule_approved' });
-                showMsg('Horário aprovado! O leitor deve comparecer.', 'success');
+            const handleApproveSummary = async (bookId) => {
+                const actRef = window.fb.doc(window.db, "activities", bookId);
+                await window.fb.updateDoc(actRef, { status: 'Resumo Aprovado', points: 50 });
+                showMsg('Resumo Aprovado! +50 pontos para o leitor.');
             };
 
-            const handleRejectSchedule = async (activityId) => {
-                await db.collection('activities').doc(activityId).update({ status: 'read', scheduleDate: null, scheduleTime: null });
-                showMsg('Agendamento rejeitado.', 'error');
+            const handleInfracao = async (e) => {
+                e.preventDefault();
+                const user = users.find(u => u.registro === infracaoData.userId);
+                if (!user) { showMsg('Leitor não encontrado', 'error'); return; }
+                const newInf = { userId: user.id, type: 'infracao', title: `Infração: ${infracaoData.motivo}`, points: -Math.abs(infracaoData.pontos), date: new Date().toISOString() };
+                await window.fb.addDoc(window.fb.collection(window.db, "activities"), newInf);
+                setInfracaoData({ userId: '', motivo: '', pontos: '' });
+                showMsg('Infração aplicada com sucesso.', 'error');
             };
 
-            const handleConfirmSummaryDelivery = async (activityId) => {
-                await db.collection('activities').doc(activityId).update({ status: 'summary_approved', points: 50 });
-                showCelebrationMsg('Fantástico! Resumo aprovado e 50 pontos liberados para o leitor! 🎉');
-            };
-
-            const handleDeleteUser = async (userId) => {
-                if(window.confirm('TEM CERTEZA? Isso excluirá o leitor permanentemente.')) {
-                    await db.collection('users').doc(userId).delete();
-                    
-                    // Deleta as atividades relacionadas (simples)
-                    activities.filter(a => a.userId === userId).forEach(async act => {
-                        await db.collection('activities').doc(act.id).delete();
-                    });
-
-                    showMsg('Leitor excluído com sucesso.', 'success');
+            const handleDeleteUser = async (user) => {
+                if (confirm(`Tem certeza que deseja EXCLUIR DEFINITIVAMENTE o leitor ${user.nome}?`)) {
+                    await window.fb.deleteDoc(window.fb.doc(window.db, "users", user.dbId));
+                    showMsg('Usuário excluído.');
                 }
             };
 
-            const handleSaveUserEdit = async (e) => {
-                e.preventDefault();
-                await db.collection('users').doc(editingUser.id).update(editingUser);
-                setEditingUser(null);
-                showMsg('Dados atualizados.', 'success');
-            };
-
-            const handleApplyPenalty = async (e) => {
-                e.preventDefault();
-                if(!penaltyData.reason) return;
-                const newAct = { id: Date.now().toString(), userId: penalizingUser.id, type: 'penalty', title: `Infração: ${penaltyData.reason}`, date: new Date().toISOString(), pointsDeducted: parseInt(penaltyData.points) };
+            const exportExcel = () => {
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(users), "Leitores_Inscritos");
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allBooks), "Livros_e_Resumos");
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(activities.filter(a => a.type === 'checkin_out')), "Horas_na_Biblioteca");
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(activities.filter(a => a.type === 'infracao')), "Infracoes");
                 
-                await db.collection('activities').doc(newAct.id).set(newAct);
-                setPenalizingUser(null); setPenaltyData({reason:'', points:10});
-                showMsg('Infração aplicada com sucesso.', 'error'); 
+                const ranking = users.map(user => {
+                    const pts = activities.filter(a => a.userId === user.id).reduce((sum, a) => sum + (a.points || 0), 0);
+                    return { Nome: user.nome, Registro: user.registro, Idade: user.idade, Pontos: pts };
+                }).sort((a, b) => b.Pontos - a.Pontos);
+                
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ranking), "Ranking_Geral");
+                XLSX.writeFile(wb, "Backup_Redes_Literarias.xlsx");
             };
-
-            const handleAdminExportData = () => {
-                const rankingExport = users.map(user => ({ ...user, points: calculateUserPoints(user.id, activities) })).sort((a, b) => b.points - a.points);
-                exportToExcel(users, activities, rankingExport);
-            };
-
-            const ranking = users.map(user => ({ ...user, points: calculateUserPoints(user.id, activities) })).sort((a, b) => b.points - a.points);
-            const getUserInfo = (userId) => users.find(u => u.id === userId);
-            const completedEvents = activities.filter(a => a.type === 'event' && a.status === 'completed').reverse();
 
             return (
-                <div className="min-h-screen bg-gray-50 pb-10">
-                    <header className="bg-gray-900 text-white p-4 shadow-xl sticky top-0 z-40 border-b-4 border-[#f8b417]">
-                        <div className="max-w-7xl mx-auto flex justify-between items-center">
-                            <h1 className="font-black text-xl"><i className="fas fa-shield-alt mr-2 text-[#f8b417]"></i> Administração</h1>
-                            <button onClick={onLogout} className="bg-red-600 px-4 py-2 rounded-xl font-bold"><i className="fas fa-power-off"></i> Sair</button>
+                <div className="min-h-screen bg-gray-50 pb-10 font-sans text-gray-800">
+                    <header className="bg-gray-900 text-white p-4 shadow-md sticky top-0 z-50">
+                        <div className="max-w-6xl mx-auto flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-[#f8b417] rounded-full flex items-center justify-center text-gray-900 font-black"><i className="fas fa-shield-alt"></i></div>
+                                <div><h1 className="font-bold text-lg leading-tight">Painel Administrativo</h1><p className="text-gray-400 text-sm">Controle Total</p></div>
+                            </div>
+                            <button onClick={onLogout} className="text-sm text-gray-400 hover:text-white font-bold"><i className="fas fa-power-off mr-1"></i> Sair</button>
                         </div>
                     </header>
 
-                    <main className="max-w-7xl mx-auto mt-6 px-4">
-                        {msg && <div className={`p-4 mb-6 rounded-xl font-bold shadow flex items-center ${msg.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{msg.text}</div>}
-
-                        <div className="flex overflow-x-auto bg-white rounded-2xl shadow-sm mb-6 border border-gray-200">
-                            <button onClick={()=>setActiveTab('leituras')} className={`py-4 px-6 font-black text-sm whitespace-nowrap transition ${activeTab==='leituras'?'bg-[#003b49] text-white':'text-gray-600'}`}><i className="fas fa-book-reader mr-2"></i> Gestão de Resumos {(pendingSchedules.length + approvedSchedules.length) > 0 && <span className="bg-red-500 text-white ml-2 px-2 py-0.5 rounded-full">{pendingSchedules.length + approvedSchedules.length}</span>}</button>
-                            <button onClick={()=>setActiveTab('leitores')} className={`py-4 px-6 font-black text-sm whitespace-nowrap transition border-l ${activeTab==='leitores'?'bg-[#003b49] text-white':'text-gray-600'}`}><i className="fas fa-users-cog mr-2"></i> Gestão de Leitores</button>
-                            <button onClick={()=>setActiveTab('status_leituras')} className={`py-4 px-6 font-black text-sm whitespace-nowrap transition border-l ${activeTab==='status_leituras'?'bg-[#003b49] text-white':'text-gray-600'}`}><i className="fas fa-book-open mr-2"></i> Status das Leituras</button>
-                            <button onClick={()=>setActiveTab('eventos')} className={`py-4 px-6 font-black text-sm whitespace-nowrap transition border-l ${activeTab==='eventos'?'bg-[#003b49] text-white':'text-gray-600'}`}><i className="fas fa-star mr-2"></i> Eventos Finalizados</button>
-                            <button onClick={()=>setActiveTab('ranking')} className={`py-4 px-6 font-black text-sm whitespace-nowrap transition border-l ${activeTab==='ranking'?'bg-[#003b49] text-white':'text-gray-600'}`}><i className="fas fa-trophy mr-2"></i> Ranking</button>
-                            <button onClick={()=>setActiveTab('exportar')} className={`py-4 px-6 font-black text-sm whitespace-nowrap transition border-l ${activeTab==='exportar'?'bg-[#003b49] text-white':'text-gray-600'}`}><i className="fas fa-file-excel mr-2"></i> Planilhas Gerais</button>
+                    <main className="max-w-6xl mx-auto mt-6 px-4">
+                        <div className="flex flex-wrap bg-white rounded-2xl shadow-sm mb-6 overflow-hidden border border-gray-200">
+                            <button onClick={() => setActiveTab('resumos')} className={`flex-1 py-4 px-4 font-black text-sm border-r border-gray-100 ${activeTab === 'resumos' ? 'bg-[#003b49] text-white' : 'text-gray-600 hover:bg-gray-50'}`}><i className="fas fa-check-double mr-2"></i> Validar Resumos</button>
+                            <button onClick={() => setActiveTab('status')} className={`flex-1 py-4 px-4 font-black text-sm border-r border-gray-100 ${activeTab === 'status' ? 'bg-[#003b49] text-white' : 'text-gray-600 hover:bg-gray-50'}`}><i className="fas fa-book mr-2"></i> Status Leituras</button>
+                            <button onClick={() => setActiveTab('leitores')} className={`flex-1 py-4 px-4 font-black text-sm border-r border-gray-100 ${activeTab === 'leitores' ? 'bg-[#003b49] text-white' : 'text-gray-600 hover:bg-gray-50'}`}><i className="fas fa-users mr-2"></i> Leitores / Infrações</button>
+                            <button onClick={exportExcel} className="flex-1 py-4 px-4 font-black text-sm bg-green-600 text-white hover:bg-green-700 transition"><i className="fas fa-file-excel mr-2"></i> Exportar Dados</button>
                         </div>
 
-                        <div className="bg-white rounded-[2rem] shadow-xl p-6 border border-gray-100 min-h-[500px]">
+                        {message.text && <div className={`p-4 rounded-xl font-bold mb-6 border-l-4 ${message.type === 'success' ? 'bg-green-50 text-green-700 border-green-500' : 'bg-red-50 text-red-700 border-red-500'}`}><i className="fas fa-info-circle mr-2"></i> {message.text}</div>}
+
+                        <div className="bg-white rounded-2xl shadow-sm p-8 border border-gray-200">
                             
-                            {activeTab === 'leituras' && (
-                                <div className="space-y-10">
-                                    <div>
-                                        <h2 className="text-2xl font-black text-gray-800 mb-4 border-b pb-2">1. Solicitações de Agendamento (Pendentes)</h2>
-                                        {pendingSchedules.length === 0 ? <p className="text-gray-500 font-bold">Nenhuma solicitação pendente.</p> : (
-                                            <div className="grid gap-4">
-                                                {pendingSchedules.map(act => {
-                                                    const u = getUserInfo(act.userId); if(!u) return null;
-                                                    return (
-                                                        <div key={act.id} className="flex flex-col md:flex-row md:items-center justify-between p-5 border-2 border-yellow-200 bg-yellow-50 rounded-2xl">
-                                                            <div className="flex items-center gap-4 mb-4 md:mb-0">
-                                                                <img src={u.foto} className="w-14 h-14 rounded-full object-cover border shadow-sm" />
-                                                                <div>
-                                                                    <p className="font-black text-lg">{u.nome} <span className="text-xs bg-white px-2 rounded border">{u.registro}</span></p>
-                                                                    <p className="text-sm font-bold text-yellow-800"><i className="fas fa-book mr-1"></i> {act.title} ({act.author})</p>
-                                                                    <p className="text-sm font-black text-indigo-700 mt-1"><i className="fas fa-clock mr-1"></i> Solicitado para: {act.scheduleDate?.split('-').reverse().join('/')} às {act.scheduleTime}</p>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex gap-2">
-                                                                <button onClick={() => handleApproveSchedule(act.id)} className="bg-green-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-green-700 shadow"><i className="fas fa-check mr-2"></i> Aprovar Horário</button>
-                                                                <button onClick={() => handleRejectSchedule(act.id)} className="bg-red-100 text-red-700 px-4 py-2 rounded-xl font-bold hover:bg-red-200"><i className="fas fa-times"></i> Rejeitar</button>
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <h2 className="text-2xl font-black text-gray-800 mb-4 border-b pb-2">2. Aguardando Entrega de Resumo (Horário Aprovado)</h2>
-                                        {approvedSchedules.length === 0 ? <p className="text-gray-500 font-bold">Nenhum resumo agendado para entrega.</p> : (
-                                            <div className="grid gap-4">
-                                                {approvedSchedules.map(act => {
-                                                    const u = getUserInfo(act.userId); if(!u) return null;
-                                                    return (
-                                                        <div key={act.id} className="flex flex-col md:flex-row md:items-center justify-between p-5 border-2 border-indigo-200 bg-indigo-50 rounded-2xl">
-                                                            <div className="flex items-center gap-4 mb-4 md:mb-0">
-                                                                <img src={u.foto} className="w-14 h-14 rounded-full object-cover border shadow-sm" />
-                                                                <div>
-                                                                    <p className="font-black text-lg">{u.nome}</p>
-                                                                    <p className="text-sm font-bold text-indigo-800"><i className="fas fa-book mr-1"></i> {act.title}</p>
-                                                                    <p className="text-sm font-black text-indigo-700 mt-1"><i className="fas fa-calendar-check mr-1"></i> Agendado: {act.scheduleDate?.split('-').reverse().join('/')} às {act.scheduleTime}</p>
-                                                                </div>
-                                                            </div>
-                                                            <button onClick={() => handleConfirmSummaryDelivery(act.id)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black hover:bg-indigo-700 shadow-lg whitespace-nowrap"><i className="fas fa-check-double mr-2"></i> Confirmar Entrega (+50 pts)</button>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeTab === 'leitores' && (
-                                <div className="overflow-x-auto border border-gray-200 rounded-3xl">
-                                    <table className="w-full text-left border-collapse text-sm">
-                                        <thead className="bg-gray-100 text-gray-600 font-bold uppercase text-xs">
-                                            <tr><th className="p-5">Leitor</th><th className="p-5">Contato / Endereço</th><th className="p-5">Responsável (Menor)</th><th className="p-5 text-right">Ações</th></tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100">
-                                            {users.map(u => (
-                                                <tr key={u.id} className="hover:bg-blue-50">
-                                                    <td className="p-5 flex items-center gap-3">
-                                                        <img src={u.foto} className="w-10 h-10 rounded-full object-cover border" />
-                                                        <div><p className="font-bold text-gray-900">{u.nome}</p><p className="text-xs font-mono text-gray-500">Reg: {u.registro} | CPF: {u.documento}</p><p className="text-xs text-blue-600 font-bold">{u.idade} anos</p></div>
-                                                    </td>
-                                                    <td className="p-5"><p><i className="fab fa-whatsapp text-green-500"></i> {u.telefone}</p><p className="text-xs text-gray-500 truncate max-w-[200px]" title={u.endereco}>{u.endereco}</p></td>
-                                                    <td className="p-5">
-                                                        {u.idade < 18 ? <div><p className="font-bold text-yellow-700">{u.nomeResponsavel}</p><p className="text-xs">{u.vinculoResponsavel} | {u.telefoneResponsavel}</p></div> : <span className="text-gray-400 italic">Maior de Idade</span>}
-                                                    </td>
-                                                    <td className="p-5 text-right">
-                                                        <div className="flex justify-end gap-2">
-                                                            <button onClick={()=>setPenalizingUser(u)} className="bg-orange-100 text-orange-700 p-2 rounded" title="Infração"><i className="fas fa-gavel"></i></button>
-                                                            <button onClick={()=>setEditingUser(u)} className="bg-blue-100 text-blue-700 p-2 rounded" title="Editar"><i className="fas fa-edit"></i></button>
-                                                            <button onClick={()=>handleDeleteUser(u.id)} className="bg-red-100 text-red-700 p-2 rounded" title="Excluir"><i className="fas fa-trash-alt"></i></button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-
-                            {activeTab === 'status_leituras' && (
-                                <div className="overflow-x-auto border border-gray-200 rounded-3xl">
-                                    <h2 className="text-2xl font-black text-gray-800 m-5 border-b pb-2">Acompanhamento Geral de Leituras</h2>
-                                    <table className="w-full text-left border-collapse text-sm">
-                                        <thead className="bg-gray-100 text-gray-600 font-bold uppercase text-xs">
-                                            <tr><th className="p-5">Leitor</th><th className="p-5">Livro / Autor</th><th className="p-5">Status Atual</th><th className="p-5 text-right">Data de Início</th></tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100">
-                                            {activities.filter(a => a.type === 'book').sort((a, b) => new Date(b.date) - new Date(a.date)).map(book => {
-                                                const u = getUserInfo(book.userId); if(!u) return null;
+                            {activeTab === 'resumos' && (
+                                <div>
+                                    <h2 className="text-2xl font-black text-[#003b49] mb-6">Aprovação de Resumos Presenciais</h2>
+                                    {pendingBooks.length === 0 ? (
+                                        <div className="text-center py-10 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200"><i className="fas fa-inbox fa-3x text-gray-300 mb-3"></i><p className="text-gray-500 font-bold">Nenhum agendamento pendente no momento.</p></div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {pendingBooks.map(act => {
+                                                const u = getUserInfo(act.userId);
+                                                if(!u) return null;
                                                 return (
-                                                    <tr key={book.id} className="hover:bg-blue-50">
-                                                        <td className="p-5 flex items-center gap-3">
-                                                            <img src={u.foto} className="w-10 h-10 rounded-full object-cover border" />
-                                                            <div><p className="font-bold text-gray-900">{u.nome}</p><p className="text-xs font-mono text-gray-500">Reg: {u.registro}</p></div>
-                                                        </td>
-                                                        <td className="p-5">
-                                                            <p className="font-bold text-gray-800">{book.title}</p>
-                                                            <p className="text-xs text-gray-600">{book.author} {book.year ? `(${book.year})` : ''}</p>
-                                                        </td>
-                                                        <td className="p-5">
-                                                            {book.status === 'reading' && <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-xs font-bold inline-block">Lendo</span>}
-                                                            {book.status === 'read' && <span className="bg-gray-200 text-gray-700 px-3 py-1 rounded-lg text-xs font-bold inline-block">Livro Lido (Sem agendamento)</span>}
-                                                            {book.status === 'schedule_pending' && <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-lg text-xs font-bold inline-block">Agendamento Pendente</span>}
-                                                            {book.status === 'schedule_approved' && <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg text-xs font-bold inline-block">Resumo Agendado</span>}
-                                                            {book.status === 'summary_approved' && <span className="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-xs font-bold inline-block">Resumo Aprovado (+50 pts)</span>}
-                                                        </td>
-                                                        <td className="p-5 text-right font-bold text-gray-500">
-                                                            {new Date(book.date).toLocaleDateString()}
-                                                        </td>
-                                                    </tr>
-                                                )
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-
-                            {activeTab === 'eventos' && (
-                                <div className="max-w-4xl">
-                                    <h2 className="text-2xl font-black text-gray-800 mb-6 border-b pb-2">Histórico de Presenças em Eventos</h2>
-                                    {completedEvents.length === 0 ? <p className="text-gray-500 font-bold">Nenhum check-out de evento registrado.</p> : (
-                                        <div className="grid gap-4">
-                                            {completedEvents.map(ev => {
-                                                const u = getUserInfo(ev.userId); if(!u) return null;
-                                                return (
-                                                    <div key={ev.id} className="p-4 border border-pink-200 bg-pink-50 rounded-2xl flex items-center justify-between">
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="bg-pink-500 text-white w-10 h-10 rounded-full flex items-center justify-center"><i className="fas fa-star"></i></div>
+                                                    <div key={act.dbId} className="flex flex-col md:flex-row md:items-center justify-between p-5 border-2 border-gray-100 rounded-2xl bg-gray-50">
+                                                        <div className="flex items-center gap-4 mb-4 md:mb-0">
+                                                            <img src={u.foto} className="w-14 h-14 rounded-full object-cover border-2 border-[#003b49]" />
                                                             <div>
-                                                                <p className="font-bold text-gray-900">{ev.title}</p>
-                                                                <p className="text-sm text-gray-600">Leitor: {u.nome} (Reg: {u.registro})</p>
+                                                                <p className="font-black text-lg text-gray-800">{u.nome}</p>
+                                                                <p className="text-sm font-bold text-gray-600">Reg: {u.registro} | Livro: <span className="text-[#003b49]">{act.title}</span></p>
+                                                                <div className="mt-2 bg-orange-100 text-orange-800 text-xs font-black px-3 py-1 rounded-full inline-flex items-center"><i className="fas fa-calendar-alt mr-2"></i> Agendado para: {act.summaryDate.split('-').reverse().join('/')} às {act.summaryTime}</div>
                                                             </div>
                                                         </div>
-                                                        <span className="font-black text-pink-700 bg-pink-200 px-3 py-1 rounded-lg">+{ev.points} pts</span>
+                                                        <button onClick={() => handleApproveSummary(act.dbId)} className="bg-green-600 text-white px-6 py-3 rounded-xl font-black hover:bg-green-700 shadow-md transition"><i className="fas fa-check-circle mr-2"></i> Aprovar (+50 pts)</button>
                                                     </div>
                                                 )
                                             })}
@@ -1019,72 +773,69 @@
                                 </div>
                             )}
 
-                            {activeTab === 'ranking' && (
-                                <div className="overflow-x-auto border border-gray-200 rounded-3xl">
-                                    <table className="w-full text-left border-collapse">
-                                        <thead className="bg-gray-50 text-gray-500 uppercase text-xs border-b"><tr><th className="p-5 text-center">Pos</th><th className="p-5">Leitor</th><th className="p-5 text-right">Pontos</th></tr></thead>
-                                        <tbody className="divide-y divide-gray-100">
-                                            {ranking.map((user, index) => (
-                                                <tr key={user.id} className="hover:bg-yellow-50 transition">
-                                                    <td className="p-5 text-center font-black text-lg text-gray-400">
-                                                        {index === 0 ? <span className="text-yellow-500 text-2xl"><i className="fas fa-crown"></i> 1º</span> : 
-                                                         index === 1 ? <span className="text-gray-400 text-xl"><i className="fas fa-medal"></i> 2º</span> : 
-                                                         index === 2 ? <span className="text-orange-400 text-xl"><i className="fas fa-award"></i> 3º</span> : `${index + 1}º`}
-                                                    </td>
-                                                    <td className="p-5 flex items-center gap-4"><img src={user.foto} className="w-12 h-12 rounded-full object-cover border shadow-sm" /><span className="font-bold text-gray-800 text-lg">{user.nome}</span></td>
-                                                    <td className="p-5 text-right"><span className="bg-blue-50 text-[#003b49] border border-blue-200 px-4 py-2 rounded-xl font-black text-2xl">{user.points}</span></td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-
-                            {activeTab === 'exportar' && (
-                                <div className="text-center py-16 max-w-lg mx-auto">
-                                    <i className="fas fa-file-excel fa-5x text-green-600 mb-6"></i>
-                                    <h2 className="text-3xl font-black text-gray-800 mb-4">Planilha Completa do Sistema</h2>
-                                    <p className="text-gray-500 mb-8 font-medium">Baixe um arquivo do Excel (.xlsx) contendo 5 abas separadas com todos os dados salvos em Nuvem.</p>
-                                    <button onClick={handleAdminExportData} className="bg-green-600 text-white font-black text-xl px-10 py-5 w-full rounded-2xl shadow-xl hover:bg-green-700 flex justify-center items-center"><i className="fas fa-download mr-3"></i> Baixar Relatório (Excel)</button>
-                                </div>
-                            )}
-                            
-                            {editingUser && (
-                                <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4">
-                                    <div className="bg-white rounded-[2rem] shadow-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
-                                        <button onClick={()=>setEditingUser(null)} className="absolute top-6 right-6 text-gray-400"><i className="fas fa-times fa-2x"></i></button>
-                                        <h3 className="font-black text-2xl mb-6 border-b pb-4">Editar Cadastro</h3>
-                                        <form onSubmit={handleSaveUserEdit} className="space-y-4">
-                                            <div><label className="block text-sm font-bold">Nome</label><input type="text" value={editingUser.nome} onChange={e=>setEditingUser({...editingUser, nome:e.target.value})} className="w-full p-3 border rounded-xl" /></div>
-                                            <div><label className="block text-sm font-bold">Documento</label><input type="text" value={editingUser.documento} onChange={e=>setEditingUser({...editingUser, documento:e.target.value})} className="w-full p-3 border rounded-xl" /></div>
-                                            <div><label className="block text-sm font-bold">Telefone</label><input type="text" value={editingUser.telefone} onChange={e=>setEditingUser({...editingUser, telefone:e.target.value})} className="w-full p-3 border rounded-xl" /></div>
-                                            <button type="submit" className="w-full bg-[#003b49] text-white font-bold py-4 rounded-xl mt-4">Salvar Alterações</button>
-                                        </form>
+                            {activeTab === 'status' && (
+                                <div>
+                                    <h2 className="text-2xl font-black text-[#003b49] mb-6">Visão Geral de Todas as Leituras</h2>
+                                    <div className="overflow-x-auto rounded-xl border border-gray-200">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead className="bg-gray-100 border-b border-gray-200 text-gray-700">
+                                                <tr><th className="p-4 font-black">Obra</th><th className="p-4 font-black">Leitor (Reg)</th><th className="p-4 font-black">Data Início</th><th className="p-4 font-black">Status Atual</th></tr>
+                                            </thead>
+                                            <tbody className="text-sm">
+                                                {allBooks.map(b => {
+                                                    const u = getUserInfo(b.userId);
+                                                    return (
+                                                        <tr key={b.dbId} className="border-b hover:bg-gray-50">
+                                                            <td className="p-4 font-bold text-gray-800">{b.title} <span className="text-xs text-gray-500 font-normal block">{b.author}</span></td>
+                                                            <td className="p-4">{u?.nome} <span className="text-xs text-gray-500 block">{u?.registro}</span></td>
+                                                            <td className="p-4">{new Date(b.date).toLocaleDateString('pt-BR')}</td>
+                                                            <td className="p-4">
+                                                                <span className={`px-3 py-1 rounded-full text-xs font-black ${b.status === 'Lendo' ? 'bg-blue-100 text-blue-700' : b.status === 'Lido' ? 'bg-yellow-100 text-yellow-700' : b.status === 'Resumo Agendado' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>{b.status}</span>
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                })}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             )}
 
-                            {penalizingUser && (
-                                <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4">
-                                    <div className="bg-white rounded-[2rem] shadow-2xl p-8 max-w-md w-full relative">
-                                        <button onClick={()=>setPenalizingUser(null)} className="absolute top-6 right-6 text-gray-400"><i className="fas fa-times fa-2x"></i></button>
-                                        <div className="text-center mb-6"><div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-2"><i className="fas fa-gavel fa-2xl"></i></div><h3 className="font-black text-xl">Aplicar Infração</h3><p className="font-bold">{penalizingUser.nome}</p></div>
-                                        <form onSubmit={handleApplyPenalty} className="space-y-4">
-                                            <div><label className="block text-sm font-bold mb-1">Motivo</label><input required type="text" value={penaltyData.reason} onChange={e=>setPenaltyData({...penaltyData, reason:e.target.value})} className="w-full p-3 border rounded-xl" /></div>
-                                            <div><label className="block text-sm font-bold mb-1">Pontos Deduzidos</label><input required type="number" step="0.1" min="0.1" value={penaltyData.points} onChange={e=>setPenaltyData({...penaltyData, points:e.target.value})} className="w-full p-3 border rounded-xl" /></div>
-                                            <button type="submit" className="w-full bg-red-600 text-white font-black py-4 rounded-xl hover:bg-red-700">Confirmar Penalidade</button>
+                            {activeTab === 'leitores' && (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                    <div className="md:col-span-1 bg-gray-50 p-6 rounded-2xl border border-gray-200">
+                                        <h3 className="font-black text-red-600 mb-4"><i className="fas fa-gavel mr-2"></i> Aplicar Infração</h3>
+                                        <form onSubmit={handleInfracao} className="space-y-4">
+                                            <div><label className="block text-xs font-bold mb-1">Registro do Leitor</label><input type="text" required value={infracaoData.userId} onChange={e => setInfracaoData({...infracaoData, userId: e.target.value})} className="w-full p-3 rounded-lg border outline-none font-medium" placeholder="Ex: RSO-123456" /></div>
+                                            <div><label className="block text-xs font-bold mb-1">Motivo / Regra Quebrada</label><input type="text" required value={infracaoData.motivo} onChange={e => setInfracaoData({...infracaoData, motivo: e.target.value})} className="w-full p-3 rounded-lg border outline-none font-medium" /></div>
+                                            <div><label className="block text-xs font-bold mb-1">Pontos a Descontar</label><input type="number" required value={infracaoData.pontos} onChange={e => setInfracaoData({...infracaoData, pontos: e.target.value})} className="w-full p-3 rounded-lg border outline-none font-medium" placeholder="Ex: 20" /></div>
+                                            <button type="submit" className="w-full bg-red-600 text-white font-black py-3 rounded-lg hover:bg-red-700"><i className="fas fa-minus-circle mr-2"></i> Descontar Pontos</button>
                                         </form>
                                     </div>
-                                </div>
-                            )}
-
-                            {celebration && (
-                                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
-                                    <div className="bg-white rounded-[2rem] shadow-2xl p-8 max-w-sm w-full text-center animate-pop-in border-4 border-green-500">
-                                        <div className="text-6xl mb-4">🏆</div>
-                                        <h3 className="font-black text-2xl text-green-700 mb-2">Sucesso!</h3>
-                                        <p className="font-bold text-gray-600 text-lg">{celebration}</p>
-                                        <button onClick={() => setCelebration(null)} className="mt-6 w-full bg-green-600 text-white font-black py-3 rounded-xl hover:bg-green-700 shadow-md">Ok</button>
+                                    <div className="md:col-span-2">
+                                        <h3 className="font-black text-[#003b49] mb-4"><i className="fas fa-users-cog mr-2"></i> Base de Leitores Inscritos</h3>
+                                        <div className="overflow-x-auto rounded-xl border border-gray-200 h-96 overflow-y-auto">
+                                            <table className="w-full text-left border-collapse">
+                                                <thead className="bg-gray-100 border-b border-gray-200 text-gray-700 sticky top-0">
+                                                    <tr><th className="p-3 font-black text-sm">Leitor</th><th className="p-3 font-black text-sm">Contato</th><th className="p-3 font-black text-sm text-right">Ação</th></tr>
+                                                </thead>
+                                                <tbody className="text-sm">
+                                                    {users.map(u => (
+                                                        <tr key={u.dbId} className="border-b hover:bg-red-50 transition">
+                                                            <td className="p-3">
+                                                                <div className="font-bold text-gray-800">{u.nome}</div>
+                                                                <div className="text-xs text-gray-500">Reg: {u.registro} | CPF: {u.documento}</div>
+                                                                {u.nomeResponsavel && <div className="text-xs text-orange-600 font-bold mt-1">Resp: {u.nomeResponsavel}</div>}
+                                                            </td>
+                                                            <td className="p-3 text-gray-600 font-medium">{u.telefone}</td>
+                                                            <td className="p-3 text-right">
+                                                                <button onClick={() => handleDeleteUser(u)} className="text-red-500 hover:text-red-700 font-black text-xs bg-red-100 px-3 py-2 rounded-lg"><i className="fas fa-trash-alt"></i> Excluir</button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
                             )}
