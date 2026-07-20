@@ -38,30 +38,6 @@
 <body>
     <div id="root"></div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-        
-        // Suas chaves exatas e corretas do Firebase
-        const firebaseConfig = {
-            apiKey: "AIzaSyBjGF-lwJt1Lk7zlEZou42zQRiUOfPlh24",
-            authDomain: "redes-literarias-rso.firebaseapp.com",
-            databaseURL: "https://redes-literarias-rso-default-rtdb.firebaseio.com",
-            projectId: "redes-literarias-rso",
-            storageBucket: "redes-literarias-rso.firebasestorage.app",
-            messagingSenderId: "469426150346",
-            appId: "1:469426150346:web:bec753b21cf64b7eca8d33"
-        };
-
-        // Exportando para o escopo global para o React acessar
-        window.app = initializeApp(firebaseConfig);
-        window.db = getFirestore(window.app);
-        window.fb = { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where };
-        
-        // Avisa ao React que o banco está pronto
-        window.dispatchEvent(new Event('firebaseReady'));
-    </script>
-
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
@@ -76,34 +52,90 @@
             const [users, setUsers] = useState([]);
             const [activities, setActivities] = useState([]); 
             const [isFirebaseLoaded, setIsFirebaseLoaded] = useState(false);
+            const [dbError, setDbError] = useState(null);
 
-            // Carregamento do Banco de Dados
+            // Carregamento do Banco de Dados Robusto
             useEffect(() => {
-                const initDB = () => {
-                    const usersRef = window.fb.collection(window.db, "users");
-                    const actRef = window.fb.collection(window.db, "activities");
+                let isMounted = true;
 
-                    window.fb.onSnapshot(usersRef, (snapshot) => {
-                        const loadedUsers = [];
-                        snapshot.forEach((doc) => loadedUsers.push({ ...doc.data(), dbId: doc.id }));
-                        setUsers(loadedUsers);
-                    });
+                const initDB = async () => {
+                    try {
+                        // Importação dinâmica (Resolve o problema de travamento no carregamento)
+                        const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js");
+                        const { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where } = await import("https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js");
+                        
+                        const firebaseConfig = {
+                            apiKey: "AIzaSyBjGF-lwJt1Lk7zlEZou42zQRiUOfPlh24",
+                            authDomain: "redes-literarias-rso.firebaseapp.com",
+                            databaseURL: "https://redes-literarias-rso-default-rtdb.firebaseio.com",
+                            projectId: "redes-literarias-rso",
+                            storageBucket: "redes-literarias-rso.firebasestorage.app",
+                            messagingSenderId: "469426150346",
+                            appId: "1:469426150346:web:bec753b21cf64b7eca8d33"
+                        };
 
-                    window.fb.onSnapshot(actRef, (snapshot) => {
-                        const loadedActs = [];
-                        snapshot.forEach((doc) => loadedActs.push({ ...doc.data(), dbId: doc.id }));
-                        setActivities(loadedActs);
-                    });
-                    
-                    setIsFirebaseLoaded(true);
+                        const app = initializeApp(firebaseConfig);
+                        const db = getFirestore(app);
+                        
+                        window.db = db;
+                        window.fb = { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where };
+
+                        const usersRef = collection(db, "users");
+                        const actRef = collection(db, "activities");
+
+                        onSnapshot(usersRef, (snapshot) => {
+                            if (!isMounted) return;
+                            const loadedUsers = [];
+                            snapshot.forEach((doc) => loadedUsers.push({ ...doc.data(), dbId: doc.id }));
+                            setUsers(loadedUsers);
+                        }, (error) => {
+                            console.error("Erro Users:", error);
+                            if (isMounted) setDbError("Permissão negada! As regras de segurança do seu Firebase expiraram.");
+                        });
+
+                        onSnapshot(actRef, (snapshot) => {
+                            if (!isMounted) return;
+                            const loadedActs = [];
+                            snapshot.forEach((doc) => loadedActs.push({ ...doc.data(), dbId: doc.id }));
+                            setActivities(loadedActs);
+                        }, (error) => {
+                            console.error("Erro Activities:", error);
+                            if (isMounted) setDbError("Permissão negada! As regras de segurança do seu Firebase expiraram.");
+                        });
+                        
+                        if (isMounted) setIsFirebaseLoaded(true);
+
+                    } catch (err) {
+                        console.error("Erro Init:", err);
+                        if (isMounted) setDbError("Erro ao conectar à nuvem. Verifique a internet ou chaves de acesso.");
+                    }
                 };
 
-                if (window.db) {
-                    initDB();
-                } else {
-                    window.addEventListener('firebaseReady', initDB);
-                }
+                initDB();
+                
+                return () => { isMounted = false; };
             }, []);
+
+            if (dbError) {
+                return (
+                    <div className="min-h-screen flex flex-col items-center justify-center text-red-700 bg-red-50 p-6 text-center font-sans">
+                        <i className="fas fa-database fa-3x mb-4 text-red-500"></i>
+                        <h2 className="text-2xl font-black mb-2">Conexão com a Nuvem Bloqueada</h2>
+                        <p className="font-bold text-lg mb-4">{dbError}</p>
+                        <div className="bg-white p-6 rounded-2xl shadow-lg border-2 border-red-200 max-w-lg text-sm text-gray-700 font-medium">
+                            <p className="mb-3 text-red-600 font-bold"><i className="fas fa-info-circle mr-1"></i> Isso geralmente acontece após 30 dias de uso, pois o Firebase bloqueia a leitura por segurança. SEUS DADOS ESTÃO SALVOS!</p>
+                            <p className="font-black text-gray-900 border-b pb-2 mb-2">Como liberar o acesso agora mesmo:</p>
+                            <ol className="text-left list-decimal ml-5 space-y-2">
+                                <li>Acesse o <strong>Firebase Console</strong> (Google)</li>
+                                <li>No menu esquerdo, vá em <strong>Firestore Database</strong> e clique na aba <strong>Regras (Rules)</strong> no topo.</li>
+                                <li>Onde estiver escrito <code className="bg-gray-100 px-1 rounded">allow read, write: if ...</code>, apague a linha e substitua por:<br/> <code className="bg-gray-100 px-2 py-1 rounded text-red-600 font-bold block mt-1 border">allow read, write: if true;</code></li>
+                                <li>Clique no botão azul <strong>Publicar</strong>.</li>
+                                <li>Volte nesta tela e atualize a página!</li>
+                            </ol>
+                        </div>
+                    </div>
+                );
+            }
 
             if (!isFirebaseLoaded) {
                 return (
