@@ -28,8 +28,11 @@
         body { font-family: 'Inter', sans-serif; }
         .bg-net {
             background-color: #f8b417;
-            background-image: radial-gradient(#d49a14 2px, transparent 2px);
-            background-size: 30px 30px;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px),
+                radial-gradient(circle at 15px 15px, rgba(255,255,255,0.4) 2px, transparent 2px);
+            background-size: 30px 30px, 30px 30px, 30px 30px;
         }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -38,6 +41,34 @@
 <body>
     <div id="root"></div>
 
+    <!-- CONEXÃO SEGURA E ESTÁVEL COM O FIREBASE -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBjGF-lwJt1Lk7zlEZou42zQRiUOfPlh24",
+            authDomain: "redes-literarias-rso.firebaseapp.com",
+            databaseURL: "https://redes-literarias-rso-default-rtdb.firebaseio.com",
+            projectId: "redes-literarias-rso",
+            storageBucket: "redes-literarias-rso.firebasestorage.app",
+            messagingSenderId: "469426150346",
+            appId: "1:469426150346:web:bec753b21cf64b7eca8d33"
+        };
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            window.db = db;
+            window.fb = { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where };
+            window.dispatchEvent(new Event('firebase-ready'));
+            console.log("Banco de dados conectado com sucesso!");
+        } catch (error) {
+            console.error("Erro Crítico no Firebase:", error);
+        }
+    </script>
+
+    <!-- CÓDIGO DA PLATAFORMA (REACT) -->
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
@@ -53,84 +84,82 @@
             const [activities, setActivities] = useState([]); 
             const [isFirebaseLoaded, setIsFirebaseLoaded] = useState(false);
             const [dbError, setDbError] = useState(null);
+            const [loadingMessage, setLoadingMessage] = useState("Conectando à Nuvem...");
 
-            // Carregamento do Banco de Dados Robusto
+            // Carregamento Super Seguro
             useEffect(() => {
                 let isMounted = true;
+                let unsubUsers = null;
+                let unsubActs = null;
 
-                const initDB = async () => {
+                const startDatabase = () => {
+                    if (!window.db) return;
                     try {
-                        // Importação dinâmica (Resolve o problema de travamento no carregamento)
-                        const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js");
-                        const { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where } = await import("https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js");
-                        
-                        const firebaseConfig = {
-                            apiKey: "AIzaSyBjGF-lwJt1Lk7zlEZou42zQRiUOfPlh24",
-                            authDomain: "redes-literarias-rso.firebaseapp.com",
-                            databaseURL: "https://redes-literarias-rso-default-rtdb.firebaseio.com",
-                            projectId: "redes-literarias-rso",
-                            storageBucket: "redes-literarias-rso.firebasestorage.app",
-                            messagingSenderId: "469426150346",
-                            appId: "1:469426150346:web:bec753b21cf64b7eca8d33"
-                        };
+                        const usersRef = window.fb.collection(window.db, "users");
+                        const actRef = window.fb.collection(window.db, "activities");
 
-                        const app = initializeApp(firebaseConfig);
-                        const db = getFirestore(app);
-                        
-                        window.db = db;
-                        window.fb = { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, where };
-
-                        const usersRef = collection(db, "users");
-                        const actRef = collection(db, "activities");
-
-                        onSnapshot(usersRef, (snapshot) => {
+                        unsubUsers = window.fb.onSnapshot(usersRef, (snapshot) => {
                             if (!isMounted) return;
                             const loadedUsers = [];
                             snapshot.forEach((doc) => loadedUsers.push({ ...doc.data(), dbId: doc.id }));
                             setUsers(loadedUsers);
                         }, (error) => {
-                            console.error("Erro Users:", error);
-                            if (isMounted) setDbError("Permissão negada! As regras de segurança do seu Firebase expiraram.");
+                            console.error(error);
+                            if (isMounted) setDbError("Erro de Regras do Firebase. O tempo de teste expirou.");
                         });
 
-                        onSnapshot(actRef, (snapshot) => {
+                        unsubActs = window.fb.onSnapshot(actRef, (snapshot) => {
                             if (!isMounted) return;
                             const loadedActs = [];
                             snapshot.forEach((doc) => loadedActs.push({ ...doc.data(), dbId: doc.id }));
                             setActivities(loadedActs);
                         }, (error) => {
-                            console.error("Erro Activities:", error);
-                            if (isMounted) setDbError("Permissão negada! As regras de segurança do seu Firebase expiraram.");
+                            console.error(error);
                         });
-                        
-                        if (isMounted) setIsFirebaseLoaded(true);
 
-                    } catch (err) {
-                        console.error("Erro Init:", err);
-                        if (isMounted) setDbError("Erro ao conectar à nuvem. Verifique a internet ou chaves de acesso.");
+                        if (isMounted) setIsFirebaseLoaded(true);
+                    } catch (e) {
+                        console.error(e);
+                        if (isMounted) setDbError("Erro ao puxar dados da nuvem.");
                     }
                 };
 
-                initDB();
-                
-                return () => { isMounted = false; };
+                if (window.db) {
+                    startDatabase();
+                } else {
+                    window.addEventListener('firebase-ready', startDatabase);
+                }
+
+                // Alerta caso a internet esteja muito lenta
+                const timer = setTimeout(() => {
+                    if (!isFirebaseLoaded && isMounted) {
+                        setLoadingMessage("A conexão está lenta. Verifique o sinal da sua internet...");
+                    }
+                }, 8000);
+
+                return () => {
+                    isMounted = false;
+                    clearTimeout(timer);
+                    if (unsubUsers) unsubUsers();
+                    if (unsubActs) unsubActs();
+                    window.removeEventListener('firebase-ready', startDatabase);
+                };
             }, []);
 
             if (dbError) {
                 return (
                     <div className="min-h-screen flex flex-col items-center justify-center text-red-700 bg-red-50 p-6 text-center font-sans">
                         <i className="fas fa-database fa-3x mb-4 text-red-500"></i>
-                        <h2 className="text-2xl font-black mb-2">Conexão com a Nuvem Bloqueada</h2>
+                        <h2 className="text-2xl font-black mb-2">Conexão Bloqueada!</h2>
                         <p className="font-bold text-lg mb-4">{dbError}</p>
                         <div className="bg-white p-6 rounded-2xl shadow-lg border-2 border-red-200 max-w-lg text-sm text-gray-700 font-medium">
-                            <p className="mb-3 text-red-600 font-bold"><i className="fas fa-info-circle mr-1"></i> Isso geralmente acontece após 30 dias de uso, pois o Firebase bloqueia a leitura por segurança. SEUS DADOS ESTÃO SALVOS!</p>
-                            <p className="font-black text-gray-900 border-b pb-2 mb-2">Como liberar o acesso agora mesmo:</p>
+                            <p className="mb-3 text-red-600 font-bold">Fique calmo! Seus dados estão salvos e seguros. Isso é apenas uma trava de segurança do Google (Firebase) após 30 dias.</p>
+                            <p className="font-black text-gray-900 border-b pb-2 mb-2">Como liberar os dados agora:</p>
                             <ol className="text-left list-decimal ml-5 space-y-2">
-                                <li>Acesse o <strong>Firebase Console</strong> (Google)</li>
-                                <li>No menu esquerdo, vá em <strong>Firestore Database</strong> e clique na aba <strong>Regras (Rules)</strong> no topo.</li>
-                                <li>Onde estiver escrito <code className="bg-gray-100 px-1 rounded">allow read, write: if ...</code>, apague a linha e substitua por:<br/> <code className="bg-gray-100 px-2 py-1 rounded text-red-600 font-bold block mt-1 border">allow read, write: if true;</code></li>
-                                <li>Clique no botão azul <strong>Publicar</strong>.</li>
-                                <li>Volte nesta tela e atualize a página!</li>
+                                <li>Acesse o <strong>Firebase Console</strong></li>
+                                <li>Vá em <strong>Firestore Database</strong> e clique em <strong>Regras (Rules)</strong>.</li>
+                                <li>Substitua por: <code className="bg-gray-100 px-2 py-1 rounded text-red-600 font-bold block mt-1 border">allow read, write: if true;</code></li>
+                                <li>Clique em <strong>Publicar</strong> e atualize a página.</li>
                             </ol>
                         </div>
                     </div>
@@ -141,7 +170,7 @@
                 return (
                     <div className="min-h-screen flex flex-col items-center justify-center text-[#003b49] bg-yellow-50">
                         <i className="fas fa-circle-notch fa-spin fa-3x mb-4"></i>
-                        <h2 className="text-xl font-bold">Conectando à Nuvem...</h2>
+                        <h2 className="text-xl font-bold">{loadingMessage}</h2>
                     </div>
                 );
             }
@@ -156,7 +185,7 @@
                 setCurrentView('login');
             };
 
-            // Roteamento de Telas
+            // Roteamento
             if (currentView === 'login') return <LoginScreen onLogin={handleLogin} onRegister={() => setCurrentView('register')} users={users} />;
             if (currentView === 'register') return <RegisterScreen onCancel={() => setCurrentView('login')} users={users} />;
             if (currentView === 'user') return <UserDashboard user={currentUser} onLogout={handleLogout} activities={activities} />;
@@ -165,6 +194,7 @@
             return null;
         }
 
+        /* --- TELA DE LOGIN --- */
         function LoginScreen({ onLogin, onRegister, users }) {
             const [mode, setMode] = useState('user'); 
             const [identifier, setIdentifier] = useState('');
@@ -172,7 +202,6 @@
             const [password, setPassword] = useState('');
             const [error, setError] = useState('');
 
-            // Checa se o prazo estourou
             const isRegistrationClosed = new Date() > DEADLINE;
 
             const handleUserLogin = (e) => {
@@ -201,12 +230,8 @@
                         </div>
                         
                         <div className="flex border-b bg-gray-50">
-                            <button className={`flex-1 py-4 font-bold text-sm ${mode === 'user' ? 'text-[#003b49] border-b-4 border-[#003b49] bg-white' : 'text-gray-400'}`} onClick={() => { setMode('user'); setError(''); }}>
-                                <i className="fas fa-book-reader mr-2"></i> Sou Leitor
-                            </button>
-                            <button className={`flex-1 py-4 font-bold text-sm ${mode === 'admin' ? 'text-[#003b49] border-b-4 border-[#003b49] bg-white' : 'text-gray-400'}`} onClick={() => { setMode('admin'); setError(''); }}>
-                                <i className="fas fa-shield-alt mr-2"></i> Admin
-                            </button>
+                            <button className={`flex-1 py-4 font-bold text-sm ${mode === 'user' ? 'text-[#003b49] border-b-4 border-[#003b49] bg-white' : 'text-gray-400'}`} onClick={() => { setMode('user'); setError(''); }}><i className="fas fa-book-reader mr-2"></i> Sou Leitor</button>
+                            <button className={`flex-1 py-4 font-bold text-sm ${mode === 'admin' ? 'text-[#003b49] border-b-4 border-[#003b49] bg-white' : 'text-gray-400'}`} onClick={() => { setMode('admin'); setError(''); }}><i className="fas fa-shield-alt mr-2"></i> Admin</button>
                         </div>
 
                         <div className="p-8">
@@ -216,14 +241,12 @@
                                 <form onSubmit={handleUserLogin} className="space-y-5">
                                     <div>
                                         <label className="block text-sm font-bold text-gray-700 mb-2">Registro ou CPF</label>
-                                        <input type="text" value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-[#003b49] outline-none font-medium bg-gray-50" placeholder="Ex: RSO-123456 ou 000.000.000-00" required />
+                                        <input type="text" value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-[#003b49] outline-none font-medium bg-gray-50" placeholder="Ex: RSO-123456 ou CPF" required />
                                     </div>
                                     <button type="submit" className="w-full bg-[#003b49] text-white py-4 rounded-xl font-black text-lg shadow-lg hover:bg-gray-800 transition">Entrar no Painel</button>
                                     <div className="text-center pt-6 mt-4 border-t">
                                         {isRegistrationClosed ? (
-                                            <div className="p-4 bg-red-50 text-red-700 rounded-xl font-bold shadow-inner border border-red-200">
-                                                <i className="fas fa-lock mr-2"></i> Inscrições encerradas
-                                            </div>
+                                            <div className="p-4 bg-red-50 text-red-700 rounded-xl font-bold shadow-inner border border-red-200"><i className="fas fa-lock mr-2"></i> Inscrições encerradas</div>
                                         ) : (
                                             <button type="button" onClick={onRegister} className="w-full bg-[#f8b417] text-[#003b49] py-4 rounded-xl font-black hover:bg-yellow-400 shadow-md">Fazer Inscrição Agora</button>
                                         )}
@@ -233,13 +256,13 @@
                                 <form onSubmit={handleAdminLogin} className="space-y-5">
                                     <div>
                                         <label className="block text-sm font-bold text-gray-700 mb-2">E-mail Administrativo</label>
-                                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-[#003b49] outline-none font-medium bg-gray-50" required />
+                                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-[#003b49] outline-none font-medium bg-gray-50" required />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-gray-700 mb-2">Senha Segura</label>
-                                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-[#003b49] outline-none font-medium bg-gray-50" required />
+                                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-[#003b49] outline-none font-medium bg-gray-50" required />
                                     </div>
-                                    <button type="submit" className="w-full bg-[#003b49] text-white py-4 rounded-xl font-black text-lg shadow-lg hover:bg-gray-800 transition mt-2">Acessar Sistema</button>
+                                    <button type="submit" className="w-full bg-[#003b49] text-white py-4 rounded-xl font-black text-lg shadow-lg hover:bg-gray-800 transition">Acessar Sistema</button>
                                 </form>
                             )}
                         </div>
@@ -248,6 +271,7 @@
             );
         }
 
+        /* --- TELA DE REGISTRO --- */
         function RegisterScreen({ onCancel, users }) {
             const isRegistrationClosed = new Date() > DEADLINE;
 
@@ -258,13 +282,13 @@
                             <i className="fas fa-lock fa-4x text-red-500 mb-6"></i>
                             <h2 className="text-3xl font-black text-gray-800 mb-4">Inscrições Encerradas</h2>
                             <p className="text-gray-600 font-bold mb-8">O prazo oficial para novas inscrições encerrou.</p>
-                            <button onClick={onCancel} className="w-full bg-[#003b49] text-white px-6 py-4 rounded-xl font-black hover:bg-gray-800 transition shadow-lg">Voltar ao Início</button>
+                            <button onClick={onCancel} className="w-full bg-[#003b49] text-white px-6 py-4 rounded-xl font-black hover:bg-gray-800 transition">Voltar ao Início</button>
                         </div>
                     </div>
                 );
             }
 
-            const [formData, setFormData] = useState({ nome: '', documento: '', nascimento: '', endereco: '', telefone: '', nomeResponsavel: '', docResponsavel: '', telefoneResponsavel: '', vinculoResponsavel: '' });
+            const [formData, setFormData] = useState({ nome: '', documento: '', nascimento: '', endereco: '', telefone: '', nomeResponsavel: '', docResponsavel: '', telefoneResponsavel: '' });
             const [selfieUrl, setSelfieUrl] = useState(null);
             const [age, setAge] = useState(null);
             const [error, setError] = useState('');
@@ -305,36 +329,21 @@
                 if (age < 11) { setError('Idade mínima não atingida.'); return; }
                 if (!selfieUrl) { setError('Adicione uma foto (selfie ou arquivo) para a sua carteirinha.'); return; }
                 
-                // Bloqueio Antifraude: Verifica se já existe Nome ou CPF
-                const exists = users.find(u => 
-                    u.documento.replace(/\D/g, '') === formData.documento.replace(/\D/g, '') || 
-                    u.nome.trim().toLowerCase() === formData.nome.trim().toLowerCase()
-                );
-
-                if (exists) {
-                    setError('Atenção: Já existe um leitor cadastrado com este Nome ou CPF.');
-                    return;
-                }
+                const exists = users.find(u => u.documento.replace(/\D/g, '') === formData.documento.replace(/\D/g, '') || u.nome.trim().toLowerCase() === formData.nome.trim().toLowerCase());
+                if (exists) { setError('Atenção: Já existe um leitor cadastrado com este Nome ou CPF.'); return; }
 
                 setLoading(true);
                 const registro = Math.floor(100000 + Math.random() * 900000).toString();
                 const num = `RSO-${registro}`;
                 
-                const newUser = {
-                    ...formData,
-                    id: Date.now().toString(),
-                    registro: num,
-                    foto: selfieUrl,
-                    idade: age,
-                    createdAt: new Date().toISOString()
-                };
+                const newUser = { ...formData, id: Date.now().toString(), registro: num, foto: selfieUrl, idade: age, createdAt: new Date().toISOString() };
 
                 try {
                     await window.fb.addDoc(window.fb.collection(window.db, "users"), newUser);
                     setRegNumber(num);
                     setSuccessMsg(true);
                 } catch (err) {
-                    setError("Erro de conexão. Tente novamente.");
+                    setError("Erro ao conectar à nuvem. Verifique a internet e tente novamente.");
                 }
                 setLoading(false);
             };
@@ -356,10 +365,7 @@
             return (
                 <div className="min-h-screen bg-gray-100 p-4 py-8 font-sans text-gray-800">
                     <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl p-6 md:p-10 border-t-8 border-[#f8b417]">
-                        <button onClick={onCancel} className="text-gray-500 hover:text-[#003b49] mb-6 flex items-center font-bold transition">
-                            <i className="fas fa-arrow-left mr-2"></i> Voltar ao Login
-                        </button>
-                        
+                        <button onClick={onCancel} className="text-gray-500 hover:text-[#003b49] mb-6 flex items-center font-bold transition"><i className="fas fa-arrow-left mr-2"></i> Voltar ao Login</button>
                         <h2 className="text-3xl font-black text-[#003b49] mb-2">Cadastro de Leitor</h2>
                         <p className="text-gray-500 font-medium mb-8">Preencha com atenção. Seus dados gerarão sua carteirinha.</p>
                         
@@ -370,70 +376,35 @@
                                 {selfieUrl ? (
                                     <img src={selfieUrl} alt="Selfie" className="w-32 h-32 rounded-full object-cover border-4 border-[#f8b417] shadow-md" />
                                 ) : (
-                                    <div className="w-32 h-32 rounded-full bg-white border-4 border-gray-200 flex items-center justify-center text-gray-400 shadow-inner">
-                                        <i className="fas fa-camera text-4xl"></i>
-                                    </div>
+                                    <div className="w-32 h-32 rounded-full bg-white border-4 border-gray-200 flex items-center justify-center text-gray-400 shadow-inner"><i className="fas fa-camera text-4xl"></i></div>
                                 )}
                                 <div className="mt-6 flex gap-3">
-                                    <label className="cursor-pointer bg-[#003b49] text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-gray-800 transition shadow-md flex items-center">
-                                        <i className="fas fa-camera mr-2"></i> Tirar Foto (Câmera)
-                                        <input type="file" accept="image/*" capture="user" className="hidden" onChange={handleImageUpload} />
-                                    </label>
-                                    <label className="cursor-pointer bg-gray-200 text-gray-700 px-4 py-3 rounded-xl text-sm font-bold hover:bg-gray-300 transition shadow-md flex items-center">
-                                        <i className="fas fa-upload mr-2"></i> Anexar Arquivo
-                                        <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                                    </label>
+                                    <label className="cursor-pointer bg-[#003b49] text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-gray-800 transition shadow-md flex items-center"><i className="fas fa-camera mr-2"></i> Tirar Foto<input type="file" accept="image/*" capture="user" className="hidden" onChange={handleImageUpload} /></label>
+                                    <label className="cursor-pointer bg-gray-200 text-gray-700 px-4 py-3 rounded-xl text-sm font-bold hover:bg-gray-300 transition shadow-md flex items-center"><i className="fas fa-upload mr-2"></i> Anexar<input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} /></label>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-4 font-medium"><i className="fas fa-info-circle mr-1"></i> Escolha uma foto nítida do seu rosto para a carteirinha.</p>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">Nome Completo</label>
-                                    <input type="text" required value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-[#003b49] outline-none bg-gray-50 font-medium" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">Data de Nascimento</label>
-                                    <input type="date" required value={formData.nascimento} onChange={handleDateChange} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-[#003b49] outline-none bg-gray-50 font-medium" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">CPF</label>
-                                    <input type="text" required value={formData.documento} onChange={e => setFormData({...formData, documento: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-[#003b49] outline-none bg-gray-50 font-medium" />
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">Endereço Completo</label>
-                                    <input type="text" required value={formData.endereco} onChange={e => setFormData({...formData, endereco: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-[#003b49] outline-none bg-gray-50 font-medium" />
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">Telefone / WhatsApp</label>
-                                    <input type="text" required value={formData.telefone} onChange={e => setFormData({...formData, telefone: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-[#003b49] outline-none bg-gray-50 font-medium" />
-                                </div>
+                                <div className="md:col-span-2"><label className="block text-sm font-bold mb-2">Nome Completo</label><input type="text" required value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-[#003b49] outline-none" /></div>
+                                <div><label className="block text-sm font-bold mb-2">Nascimento</label><input type="date" required value={formData.nascimento} onChange={handleDateChange} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-[#003b49] outline-none" /></div>
+                                <div><label className="block text-sm font-bold mb-2">CPF</label><input type="text" required value={formData.documento} onChange={e => setFormData({...formData, documento: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-[#003b49] outline-none" /></div>
+                                <div className="md:col-span-2"><label className="block text-sm font-bold mb-2">Endereço Completo</label><input type="text" required value={formData.endereco} onChange={e => setFormData({...formData, endereco: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-[#003b49] outline-none" /></div>
+                                <div className="md:col-span-2"><label className="block text-sm font-bold mb-2">Telefone/WhatsApp</label><input type="text" required value={formData.telefone} onChange={e => setFormData({...formData, telefone: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-[#003b49] outline-none" /></div>
                             </div>
 
                             {age !== null && age >= 11 && age < 18 && (
                                 <div className="p-6 bg-yellow-50 border-2 border-yellow-300 rounded-2xl space-y-5">
-                                    <h3 className="font-black text-yellow-800 flex items-center text-lg">
-                                        <i className="fas fa-shield-alt mr-2"></i> Dados do Responsável (Obrigatório)
-                                    </h3>
+                                    <h3 className="font-black text-yellow-800 flex items-center text-lg"><i className="fas fa-shield-alt mr-2"></i> Dados do Responsável (Obrigatório)</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                        <div className="md:col-span-2">
-                                            <label className="block text-sm font-bold text-gray-700 mb-2">Nome do Responsável</label>
-                                            <input type="text" required value={formData.nomeResponsavel} onChange={e => setFormData({...formData, nomeResponsavel: e.target.value})} className="w-full p-4 border-2 border-yellow-200 rounded-xl bg-white focus:border-[#003b49] outline-none" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-bold text-gray-700 mb-2">CPF do Responsável</label>
-                                            <input type="text" required value={formData.docResponsavel} onChange={e => setFormData({...formData, docResponsavel: e.target.value})} className="w-full p-4 border-2 border-yellow-200 rounded-xl bg-white focus:border-[#003b49] outline-none" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-bold text-gray-700 mb-2">Contato do Responsável</label>
-                                            <input type="text" required value={formData.telefoneResponsavel} onChange={e => setFormData({...formData, telefoneResponsavel: e.target.value})} className="w-full p-4 border-2 border-yellow-200 rounded-xl bg-white focus:border-[#003b49] outline-none" />
-                                        </div>
+                                        <div className="md:col-span-2"><label className="block text-sm font-bold mb-2">Nome do Responsável</label><input type="text" required value={formData.nomeResponsavel} onChange={e => setFormData({...formData, nomeResponsavel: e.target.value})} className="w-full p-4 border-2 rounded-xl" /></div>
+                                        <div><label className="block text-sm font-bold mb-2">CPF Responsável</label><input type="text" required value={formData.docResponsavel} onChange={e => setFormData({...formData, docResponsavel: e.target.value})} className="w-full p-4 border-2 rounded-xl" /></div>
+                                        <div><label className="block text-sm font-bold mb-2">Contato Responsável</label><input type="text" required value={formData.telefoneResponsavel} onChange={e => setFormData({...formData, telefoneResponsavel: e.target.value})} className="w-full p-4 border-2 rounded-xl" /></div>
                                     </div>
                                 </div>
                             )}
 
                             <button type="submit" disabled={age !== null && age < 11 || loading} className={`w-full py-5 rounded-2xl font-black text-xl text-white transition shadow-lg mt-8 ${age !== null && age < 11 ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#f8b417] hover:bg-yellow-500 text-[#003b49]'}`}>
-                                {loading ? <i className="fas fa-spinner fa-spin"></i> : 'Concluir Cadastro Oficial'}
+                                {loading ? <i className="fas fa-spinner fa-spin"></i> : 'Concluir Cadastro'}
                             </button>
                         </form>
                     </div>
@@ -441,18 +412,18 @@
             );
         }
 
+        /* --- PAINEL DO LEITOR --- */
         function UserDashboard({ user, onLogout, activities }) {
             const [activeTab, setActiveTab] = useState('perfil'); 
             const [bookData, setBookData] = useState({ title: '', author: '', year: '' });
-            const [summaryData, setSummaryData] = useState({ bookId: '', date: '', time: '' });
             const [rating, setRating] = useState(0);
             const [message, setMessage] = useState({ text: '', type: '' });
             const [loadingLocation, setLoadingLocation] = useState(false);
             const cardRef = useRef(null);
 
             const userActivities = activities.filter(a => a.userId === user.id);
-            const books = userActivities.filter(a => a.type === 'book');
-            const totalPoints = userActivities.reduce((sum, act) => act.status === 'approved' || act.status === 'Lido' || act.status === 'Resumo Aprovado' || act.type === 'checkin_out' || act.type === 'event' ? sum + act.points : sum, 0);
+            // SOMA DE PONTOS A PROVA DE FALHAS (Garante que tudo seja número)
+            const totalPoints = userActivities.reduce((sum, act) => sum + (Number(act.points) || 0), 0);
 
             const showMsg = (text, type = 'success') => {
                 setMessage({ text, type });
@@ -485,37 +456,29 @@
                 const actRef = window.fb.doc(window.db, "activities", book.dbId);
                 await window.fb.updateDoc(actRef, { status: 'Lido', rating: rating, points: 10 });
                 setRating(0);
-                showMsg('Parabéns por concluir mais um livro! +10 pontos na sua conta! 🌟');
+                showMsg('Parabéns! Você concluiu uma leitura! +10 pontos 🌟');
             };
 
-            const handleScheduleSummary = async (e) => {
-                e.preventDefault();
-                if(!summaryData.bookId) { showMsg('Selecione um livro lido.', 'error'); return; }
-                const d = new Date(summaryData.date);
-                if (d.getUTCDay() < 2 || d.getUTCDay() > 4) { showMsg('Apenas Terça a Quinta.', 'error'); return; }
-                
-                const actRef = window.fb.doc(window.db, "activities", summaryData.bookId);
-                await window.fb.updateDoc(actRef, { status: 'Resumo Agendado', summaryDate: summaryData.date, summaryTime: summaryData.time });
-                setSummaryData({ bookId: '', date: '', time: '' });
-                showMsg('Agendamento enviado para aprovação da Biblioteca! Aguarde.');
+            // AGENDAMENTO DIRETO NA ABA (Fácil e Seguro)
+            const handleScheduleRequest = async (bookId) => {
+                if (!confirm("Atenção: O resumo presencial é escrito na Biblioteca sem consulta. Deseja pedir aprovação?")) return;
+                const actRef = window.fb.doc(window.db, "activities", bookId);
+                await window.fb.updateDoc(actRef, { status: 'Resumo Agendado' });
+                showMsg('Pedido enviado! Aguarde o Administrador aprovar sua vinda.');
                 setActiveTab('perfil');
-            };
-
-            // Cálculo de Checkin Geográfico
-            const calcDistance = (lat1, lon1, lat2, lon2) => {
-                const R = 6371; const dLat = (lat2-lat1)*(Math.PI/180); const dLon = (lon2-lon1)*(Math.PI/180);
-                const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*(Math.PI/180))*Math.cos(lat2*(Math.PI/180))*Math.sin(dLon/2)*Math.sin(dLon/2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                return R * c;
             };
 
             const handleCheckIn = () => {
                 setLoadingLocation(true);
                 if(navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(async (pos) => {
-                        const dist = calcDistance(-9.62, -42.08, pos.coords.latitude, pos.coords.longitude);
-                        if (dist <= 1.0) { // 1km radius
-                            const newCheckin = { userId: user.id, type: 'checkin', checkinTime: new Date().toISOString(), status: 'active' };
+                        // Distância Biblioteca de Remanso
+                        const R = 6371; const dLat = (-9.62-pos.coords.latitude)*(Math.PI/180); const dLon = (-42.08-pos.coords.longitude)*(Math.PI/180);
+                        const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(pos.coords.latitude*(Math.PI/180))*Math.cos(-9.62*(Math.PI/180))*Math.sin(dLon/2)*Math.sin(dLon/2);
+                        const dist = R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+
+                        if (dist <= 1.0) { 
+                            const newCheckin = { userId: user.id, type: 'checkin', checkinTime: new Date().toISOString(), status: 'active', points: 0 };
                             await window.fb.addDoc(window.fb.collection(window.db, "activities"), newCheckin);
                             showMsg('Check-in realizado! Boa leitura na biblioteca.');
                         } else {
@@ -539,10 +502,11 @@
 
                 const actRef = window.fb.doc(window.db, "activities", checkinRecord.dbId);
                 await window.fb.updateDoc(actRef, { type: 'checkin_out', checkoutTime: outTime.toISOString(), durationMins: diffMins, points: pts, status: 'completed' });
-                showMsg(`Check-out concluído! Tempo: ${diffMins} min. Pontos ganhos: ${pts}.`);
+                showMsg(`Check-out! Tempo: ${diffMins} min. Pontos: ${pts}.`);
             };
 
             const activeCheckin = userActivities.find(a => a.type === 'checkin' && a.status === 'active');
+            const books = userActivities.filter(a => a.type === 'book');
 
             return (
                 <div className="min-h-screen bg-gray-100 pb-10 font-sans text-gray-800">
@@ -558,9 +522,7 @@
 
                     <main className="max-w-4xl mx-auto mt-6 px-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            
                             <div className="md:col-span-1 space-y-6">
-                                {/* Carteirinha de Identificação */}
                                 <div ref={cardRef} className="bg-gradient-to-b from-[#003b49] to-gray-900 rounded-3xl shadow-xl overflow-hidden relative border-4 border-white">
                                     <div className="bg-[#f8b417] h-24 w-full absolute top-0 left-0 z-0 rounded-b-[50px] shadow-md"></div>
                                     <div className="relative z-10 p-6 flex flex-col items-center pt-8">
@@ -578,20 +540,20 @@
 
                             <div className="md:col-span-2 space-y-6">
                                 <div className="bg-white rounded-2xl shadow-sm p-2 flex gap-1 overflow-x-auto hide-scrollbar border border-gray-200">
-                                    <button onClick={() => setActiveTab('perfil')} className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm whitespace-nowrap transition ${activeTab === 'perfil' ? 'bg-[#003b49] text-white shadow-md' : 'text-gray-500 hover:bg-gray-100'}`}><i className="fas fa-history mr-2"></i> Histórico</button>
-                                    <button onClick={() => setActiveTab('livro')} className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm whitespace-nowrap transition ${activeTab === 'livro' ? 'bg-[#003b49] text-white shadow-md' : 'text-gray-500 hover:bg-gray-100'}`}><i className="fas fa-book-open mr-2"></i> Cadastrar Livro</button>
-                                    <button onClick={() => setActiveTab('resumo')} className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm whitespace-nowrap transition ${activeTab === 'resumo' ? 'bg-[#f8b417] text-[#003b49] shadow-md' : 'text-gray-500 hover:bg-gray-100'}`}><i className="fas fa-edit mr-2"></i> Agendar Resumo</button>
-                                    <button onClick={() => setActiveTab('checkin')} className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm whitespace-nowrap transition ${activeTab === 'checkin' ? 'bg-[#003b49] text-white shadow-md' : 'text-gray-500 hover:bg-gray-100'}`}><i className="fas fa-map-marker-alt mr-2"></i> Check-in Biblio.</button>
+                                    <button onClick={() => setActiveTab('perfil')} className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm whitespace-nowrap transition ${activeTab === 'perfil' ? 'bg-[#003b49] text-white' : 'text-gray-500 hover:bg-gray-100'}`}><i className="fas fa-history mr-2"></i> Histórico</button>
+                                    <button onClick={() => setActiveTab('livro')} className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm whitespace-nowrap transition ${activeTab === 'livro' ? 'bg-[#003b49] text-white' : 'text-gray-500 hover:bg-gray-100'}`}><i className="fas fa-book-open mr-2"></i> Cadastrar Livro</button>
+                                    <button onClick={() => setActiveTab('resumo')} className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm whitespace-nowrap transition ${activeTab === 'resumo' ? 'bg-[#f8b417] text-[#003b49]' : 'text-gray-500 hover:bg-gray-100'}`}><i className="fas fa-edit mr-2"></i> Agendar Resumo</button>
+                                    <button onClick={() => setActiveTab('checkin')} className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm whitespace-nowrap transition ${activeTab === 'checkin' ? 'bg-[#003b49] text-white' : 'text-gray-500 hover:bg-gray-100'}`}><i className="fas fa-map-marker-alt mr-2"></i> Check-in</button>
                                 </div>
 
                                 {message.text && <div className={`p-4 rounded-xl font-bold shadow-sm border-l-4 ${message.type === 'success' ? 'bg-green-50 text-green-700 border-green-500' : 'bg-red-50 text-red-700 border-red-500'}`}><i className={`fas ${message.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2`}></i> {message.text}</div>}
 
                                 {activeTab === 'perfil' && (
                                     <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
-                                        <h3 className="font-black text-xl text-[#003b49] mb-6 flex items-center"><i className="fas fa-stream mr-3"></i> Suas Atividades</h3>
+                                        <h3 className="font-black text-xl text-[#003b49] mb-6"><i className="fas fa-stream mr-3"></i> Suas Atividades</h3>
                                         <div className="space-y-4">
                                             {books.map(b => (
-                                                <div key={b.dbId} className="border-2 border-gray-100 rounded-xl p-4 hover:border-blue-200 transition">
+                                                <div key={b.dbId} className="border-2 border-gray-100 rounded-xl p-4">
                                                     <div className="flex justify-between items-start">
                                                         <div>
                                                             <h4 className="font-bold text-lg text-gray-800">{b.title}</h4>
@@ -608,7 +570,7 @@
                                                                     <button onClick={() => markAsRead(b)} className="bg-green-500 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-green-600">Marcar como Lido</button>
                                                                 </div>
                                                             )}
-                                                            {b.status === 'Lido' && <button onClick={() => setActiveTab('resumo')} className="bg-[#f8b417] text-[#003b49] text-xs font-bold px-3 py-2 rounded-lg hover:bg-yellow-500">Agendar Resumo</button>}
+                                                            {b.status === 'Lido' && <button onClick={() => setActiveTab('resumo')} className="bg-[#f8b417] text-[#003b49] text-xs font-bold px-3 py-2 rounded-lg hover:bg-yellow-500 mt-2">Agendar Resumo</button>}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -619,7 +581,7 @@
                                                         <p className="font-bold text-gray-700">{act.type === 'checkin_out' ? 'Estudo na Biblioteca' : act.title || act.type}</p>
                                                         <p className="text-xs text-gray-500">{new Date(act.checkoutTime || act.date || act.createdAt).toLocaleDateString('pt-BR')}</p>
                                                     </div>
-                                                    <span className="font-black text-green-600 bg-green-100 px-3 py-1 rounded-lg">+{act.points || 0} pts</span>
+                                                    <span className={`font-black px-3 py-1 rounded-lg ${act.points < 0 ? 'text-red-600 bg-red-100' : 'text-green-600 bg-green-100'}`}>{act.points > 0 ? '+' : ''}{act.points} pts</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -629,66 +591,51 @@
                                 {activeTab === 'livro' && (
                                     <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
                                         <h3 className="font-black text-xl text-[#003b49] mb-2"><i className="fas fa-plus-circle mr-2"></i> Iniciar Leitura</h3>
-                                        <p className="text-gray-500 font-medium mb-6">Cadastre o livro que vai ler. Pode ser da biblioteca ou seu próprio.</p>
                                         <form onSubmit={handleRegisterBook} className="space-y-5">
-                                            <div><label className="block text-sm font-bold text-gray-700 mb-2">Título da Obra</label><input type="text" required value={bookData.title} onChange={e => setBookData({...bookData, title: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl bg-gray-50 outline-none focus:border-[#003b49]" /></div>
+                                            <div><label className="block text-sm font-bold mb-2">Título da Obra</label><input type="text" required value={bookData.title} onChange={e => setBookData({...bookData, title: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-gray-50 outline-none" /></div>
                                             <div className="grid grid-cols-2 gap-4">
-                                                <div><label className="block text-sm font-bold text-gray-700 mb-2">Autor</label><input type="text" required value={bookData.author} onChange={e => setBookData({...bookData, author: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl bg-gray-50 outline-none focus:border-[#003b49]" /></div>
-                                                <div><label className="block text-sm font-bold text-gray-700 mb-2">Ano / Edição</label><input type="text" value={bookData.year} onChange={e => setBookData({...bookData, year: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl bg-gray-50 outline-none focus:border-[#003b49]" /></div>
+                                                <div><label className="block text-sm font-bold mb-2">Autor</label><input type="text" required value={bookData.author} onChange={e => setBookData({...bookData, author: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-gray-50" /></div>
+                                                <div><label className="block text-sm font-bold mb-2">Ano</label><input type="text" value={bookData.year} onChange={e => setBookData({...bookData, year: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-gray-50" /></div>
                                             </div>
-                                            <button type="submit" className="w-full bg-[#003b49] text-white font-black py-4 rounded-xl hover:bg-gray-800 transition shadow-lg text-lg mt-4">Salvar e Começar a Ler</button>
+                                            <button type="submit" className="w-full bg-[#003b49] text-white font-black py-4 rounded-xl hover:bg-gray-800 transition">Salvar Leitura</button>
                                         </form>
                                     </div>
                                 )}
 
                                 {activeTab === 'resumo' && (
                                     <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
-                                        <h3 className="font-black text-xl text-[#003b49] mb-4"><i className="fas fa-calendar-check mr-2"></i> Agendar Entrega de Resumo</h3>
-                                        <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-xl mb-6 text-orange-800 font-medium text-sm">
-                                            <strong>AVISO OFICIAL:</strong> O resumo é escrito presencialmente, sem consulta, na Biblioteca Municipal Dr. Délio Ledoux. 
-                                            <br/>Agendamentos: <strong>Terça a Quinta, das 9h às 17:30h</strong>. Vale muitos pontos!
+                                        <h3 className="font-black text-xl text-[#003b49] mb-4"><i className="fas fa-calendar-check mr-2"></i> Agendamento de Resumo</h3>
+                                        <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-xl mb-6 text-orange-800 text-sm">
+                                            <strong>AVISO OFICIAL:</strong> O resumo é escrito presencialmente, sem consulta, na Biblioteca Municipal Dr. Délio Ledoux.<br/>
+                                            <strong>Dias:</strong> Terça a Quinta.<br/><strong>Horário:</strong> das 9h às 17:30h.<br/>
+                                            Clique no botão abaixo para avisar o Administrador que você deseja fazer um resumo.
                                         </div>
-                                        <form onSubmit={handleScheduleSummary} className="space-y-5">
-                                            <div>
-                                                <label className="block text-sm font-bold text-gray-700 mb-2">Qual livro você leu?</label>
-                                                <select required value={summaryData.bookId} onChange={e => setSummaryData({...summaryData, bookId: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl bg-gray-50 outline-none focus:border-[#003b49] font-medium">
-                                                    <option value="">Selecione um livro com status LIDO</option>
-                                                    {books.filter(b => b.status === 'Lido').map(b => <option key={b.dbId} value={b.dbId}>{b.title}</option>)}
-                                                </select>
+                                        {books.filter(b => b.status === 'Lido').map(b => (
+                                            <div key={b.dbId} className="flex justify-between items-center p-4 border-2 border-gray-100 rounded-xl mb-3">
+                                                <p className="font-bold text-gray-800">{b.title}</p>
+                                                <button onClick={() => handleScheduleRequest(b.dbId)} className="bg-[#f8b417] text-[#003b49] font-black px-4 py-2 rounded-lg hover:bg-yellow-500 shadow-md">Pedir Agendamento</button>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div><label className="block text-sm font-bold text-gray-700 mb-2">Data Desejada</label><input type="date" required value={summaryData.date} onChange={e => setSummaryData({...summaryData, date: e.target.value})} className="w-full p-4 border-2 border-gray-200 rounded-xl bg-gray-50 outline-none focus:border-[#003b49]" /></div>
-                                                <div><label className="block text-sm font-bold text-gray-700 mb-2">Horário</label><input type="time" required value={summaryData.time} onChange={e => setSummaryData({...summaryData, time: e.target.value})} min="09:00" max="17:30" className="w-full p-4 border-2 border-gray-200 rounded-xl bg-gray-50 outline-none focus:border-[#003b49]" /></div>
-                                            </div>
-                                            <button type="submit" className="w-full bg-[#f8b417] text-[#003b49] font-black py-4 rounded-xl hover:bg-yellow-500 transition shadow-lg text-lg mt-4">Enviar Pedido para a Biblioteca</button>
-                                        </form>
+                                        ))}
+                                        {books.filter(b => b.status === 'Lido').length === 0 && <p className="text-gray-500 text-center font-bold">Você não tem livros com status 'Lido' para agendar.</p>}
                                     </div>
                                 )}
 
                                 {activeTab === 'checkin' && (
                                     <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200 text-center">
-                                        <h3 className="font-black text-xl text-[#003b49] mb-4">Check-in de Estudo e Eventos</h3>
-                                        <p className="text-gray-500 font-medium mb-8">Ganhe pontos por ler presencialmente na biblioteca. O GPS verificará sua localização (Raio de 1km).</p>
-                                        
+                                        <h3 className="font-black text-xl text-[#003b49] mb-4">Check-in na Biblioteca</h3>
                                         {!activeCheckin ? (
                                             <button onClick={handleCheckIn} disabled={loadingLocation} className="bg-[#003b49] text-white w-48 h-48 rounded-full shadow-2xl font-black text-2xl hover:scale-105 transition flex flex-col items-center justify-center mx-auto border-8 border-blue-100">
-                                                {loadingLocation ? <i className="fas fa-spinner fa-spin mb-2"></i> : <i className="fas fa-map-marker-alt mb-2 text-4xl text-[#f8b417]"></i>}
-                                                {loadingLocation ? 'Buscando...' : 'Fazer Check-in'}
+                                                {loadingLocation ? <i className="fas fa-spinner fa-spin mb-2"></i> : <i className="fas fa-map-marker-alt mb-2 text-[#f8b417] text-4xl"></i>}
+                                                Fazer Check-in
                                             </button>
                                         ) : (
                                             <div className="bg-green-50 p-8 rounded-3xl border-2 border-green-200">
                                                 <i className="fas fa-clock fa-3x text-green-500 mb-4 animate-pulse"></i>
                                                 <h4 className="font-black text-xl text-green-800 mb-2">Tempo Contando...</h4>
-                                                <p className="text-green-700 font-medium mb-6">Você entrou às {new Date(activeCheckin.checkinTime).toLocaleTimeString('pt-BR')}</p>
-                                                <button onClick={() => handleCheckOut(activeCheckin)} className="bg-red-600 text-white font-black py-4 px-10 rounded-xl shadow-lg hover:bg-red-700 text-lg"><i className="fas fa-sign-out-alt mr-2"></i> Fazer Check-out e Salvar Pontos</button>
+                                                <p className="text-green-700 font-medium mb-6">Entrada: {new Date(activeCheckin.checkinTime).toLocaleTimeString('pt-BR')}</p>
+                                                <button onClick={() => handleCheckOut(activeCheckin)} className="bg-red-600 text-white font-black py-4 px-10 rounded-xl shadow-lg hover:bg-red-700">Fazer Check-out</button>
                                             </div>
                                         )}
-                                        <div className="mt-8 grid grid-cols-4 gap-2 text-xs font-bold text-gray-500">
-                                            <div className="bg-gray-50 p-2 rounded">20min = 0.5pt</div>
-                                            <div className="bg-gray-50 p-2 rounded">30min = 1.0pt</div>
-                                            <div className="bg-gray-50 p-2 rounded">40min = 2.0pt</div>
-                                            <div className="bg-gray-50 p-2 rounded">60min = 3.0pt</div>
-                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -698,25 +645,26 @@
             );
         }
 
+        /* --- PAINEL DO ADMINISTRADOR --- */
         function AdminDashboard({ onLogout, users, activities }) {
             const [activeTab, setActiveTab] = useState('resumos'); 
             const [message, setMessage] = useState({ text: '', type: '' });
             const [infracaoData, setInfracaoData] = useState({ userId: '', motivo: '', pontos: '' });
+            const [eventData, setEventData] = useState({ userId: '', nome: '' });
 
             const showMsg = (text, type = 'success') => {
                 setMessage({ text, type });
                 setTimeout(() => setMessage({ text: '', type: '' }), 4000);
             };
 
-            const getUserInfo = (id) => users.find(u => u.id === id);
-
             const pendingBooks = activities.filter(a => a.status === 'Resumo Agendado');
             const allBooks = activities.filter(a => a.type === 'book');
+            const getUserInfo = (id) => users.find(u => u.id === id);
             
             const handleApproveSummary = async (bookId) => {
                 const actRef = window.fb.doc(window.db, "activities", bookId);
                 await window.fb.updateDoc(actRef, { status: 'Resumo Aprovado', points: 50 });
-                showMsg('Resumo Aprovado! +50 pontos para o leitor.');
+                showMsg('Resumo Aprovado! +50 pontos.');
             };
 
             const handleInfracao = async (e) => {
@@ -726,7 +674,17 @@
                 const newInf = { userId: user.id, type: 'infracao', title: `Infração: ${infracaoData.motivo}`, points: -Math.abs(infracaoData.pontos), date: new Date().toISOString() };
                 await window.fb.addDoc(window.fb.collection(window.db, "activities"), newInf);
                 setInfracaoData({ userId: '', motivo: '', pontos: '' });
-                showMsg('Infração aplicada com sucesso.', 'error');
+                showMsg('Infração aplicada.', 'error');
+            };
+
+            const handleEvent = async (e) => {
+                e.preventDefault();
+                const user = users.find(u => u.registro === eventData.userId);
+                if (!user) { showMsg('Leitor não encontrado', 'error'); return; }
+                const newEvt = { userId: user.id, type: 'event', title: `Evento: ${eventData.nome}`, points: 30, date: new Date().toISOString() };
+                await window.fb.addDoc(window.fb.collection(window.db, "activities"), newEvt);
+                setEventData({ userId: '', nome: '' });
+                showMsg('Participação em evento registrada! +30 pts.');
             };
 
             const handleDeleteUser = async (user) => {
@@ -741,10 +699,11 @@
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(users), "Leitores_Inscritos");
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allBooks), "Livros_e_Resumos");
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(activities.filter(a => a.type === 'checkin_out')), "Horas_na_Biblioteca");
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(activities.filter(a => a.type === 'event')), "Eventos");
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(activities.filter(a => a.type === 'infracao')), "Infracoes");
                 
                 const ranking = users.map(user => {
-                    const pts = activities.filter(a => a.userId === user.id).reduce((sum, a) => sum + (a.points || 0), 0);
+                    const pts = activities.filter(a => a.userId === user.id).reduce((sum, a) => sum + (Number(a.points) || 0), 0);
                     return { Nome: user.nome, Registro: user.registro, Idade: user.idade, Pontos: pts };
                 }).sort((a, b) => b.Pontos - a.Pontos);
                 
@@ -768,40 +727,33 @@
                         <div className="flex flex-wrap bg-white rounded-2xl shadow-sm mb-6 overflow-hidden border border-gray-200">
                             <button onClick={() => setActiveTab('resumos')} className={`flex-1 py-4 px-4 font-black text-sm border-r border-gray-100 ${activeTab === 'resumos' ? 'bg-[#003b49] text-white' : 'text-gray-600 hover:bg-gray-50'}`}><i className="fas fa-check-double mr-2"></i> Validar Resumos</button>
                             <button onClick={() => setActiveTab('status')} className={`flex-1 py-4 px-4 font-black text-sm border-r border-gray-100 ${activeTab === 'status' ? 'bg-[#003b49] text-white' : 'text-gray-600 hover:bg-gray-50'}`}><i className="fas fa-book mr-2"></i> Status Leituras</button>
-                            <button onClick={() => setActiveTab('leitores')} className={`flex-1 py-4 px-4 font-black text-sm border-r border-gray-100 ${activeTab === 'leitores' ? 'bg-[#003b49] text-white' : 'text-gray-600 hover:bg-gray-50'}`}><i className="fas fa-users mr-2"></i> Leitores / Infrações</button>
+                            <button onClick={() => setActiveTab('leitores')} className={`flex-1 py-4 px-4 font-black text-sm border-r border-gray-100 ${activeTab === 'leitores' ? 'bg-[#003b49] text-white' : 'text-gray-600 hover:bg-gray-50'}`}><i className="fas fa-users mr-2"></i> Gestão Admin</button>
                             <button onClick={exportExcel} className="flex-1 py-4 px-4 font-black text-sm bg-green-600 text-white hover:bg-green-700 transition"><i className="fas fa-file-excel mr-2"></i> Exportar Dados</button>
                         </div>
 
                         {message.text && <div className={`p-4 rounded-xl font-bold mb-6 border-l-4 ${message.type === 'success' ? 'bg-green-50 text-green-700 border-green-500' : 'bg-red-50 text-red-700 border-red-500'}`}><i className="fas fa-info-circle mr-2"></i> {message.text}</div>}
 
                         <div className="bg-white rounded-2xl shadow-sm p-8 border border-gray-200">
-                            
                             {activeTab === 'resumos' && (
                                 <div>
-                                    <h2 className="text-2xl font-black text-[#003b49] mb-6">Aprovação de Resumos Presenciais</h2>
-                                    {pendingBooks.length === 0 ? (
-                                        <div className="text-center py-10 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200"><i className="fas fa-inbox fa-3x text-gray-300 mb-3"></i><p className="text-gray-500 font-bold">Nenhum agendamento pendente no momento.</p></div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            {pendingBooks.map(act => {
-                                                const u = getUserInfo(act.userId);
-                                                if(!u) return null;
-                                                return (
-                                                    <div key={act.dbId} className="flex flex-col md:flex-row md:items-center justify-between p-5 border-2 border-gray-100 rounded-2xl bg-gray-50">
-                                                        <div className="flex items-center gap-4 mb-4 md:mb-0">
-                                                            <img src={u.foto} className="w-14 h-14 rounded-full object-cover border-2 border-[#003b49]" />
-                                                            <div>
-                                                                <p className="font-black text-lg text-gray-800">{u.nome}</p>
-                                                                <p className="text-sm font-bold text-gray-600">Reg: {u.registro} | Livro: <span className="text-[#003b49]">{act.title}</span></p>
-                                                                <div className="mt-2 bg-orange-100 text-orange-800 text-xs font-black px-3 py-1 rounded-full inline-flex items-center"><i className="fas fa-calendar-alt mr-2"></i> Agendado para: {act.summaryDate.split('-').reverse().join('/')} às {act.summaryTime}</div>
-                                                            </div>
-                                                        </div>
-                                                        <button onClick={() => handleApproveSummary(act.dbId)} className="bg-green-600 text-white px-6 py-3 rounded-xl font-black hover:bg-green-700 shadow-md transition"><i className="fas fa-check-circle mr-2"></i> Aprovar (+50 pts)</button>
+                                    <h2 className="text-2xl font-black text-[#003b49] mb-6">Aprovação de Resumos</h2>
+                                    {pendingBooks.map(act => {
+                                        const u = getUserInfo(act.userId);
+                                        if(!u) return null;
+                                        return (
+                                            <div key={act.dbId} className="flex justify-between items-center p-5 border-2 border-gray-100 rounded-2xl bg-gray-50 mb-3">
+                                                <div className="flex items-center gap-4">
+                                                    <img src={u.foto} className="w-14 h-14 rounded-full border-2 border-[#003b49]" />
+                                                    <div>
+                                                        <p className="font-black text-lg">{u.nome}</p>
+                                                        <p className="text-sm font-bold text-gray-600">Reg: {u.registro} | Livro: <span className="text-[#003b49]">{act.title}</span></p>
                                                     </div>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
+                                                </div>
+                                                <button onClick={() => handleApproveSummary(act.dbId)} className="bg-green-600 text-white px-6 py-3 rounded-xl font-black hover:bg-green-700 transition"><i className="fas fa-check-circle mr-2"></i> Confirmar Presença e Dar Pontos</button>
+                                            </div>
+                                        )
+                                    })}
+                                    {pendingBooks.length === 0 && <p className="text-center font-bold text-gray-500 py-10">Nenhum resumo aguardando.</p>}
                                 </div>
                             )}
 
@@ -811,7 +763,7 @@
                                     <div className="overflow-x-auto rounded-xl border border-gray-200">
                                         <table className="w-full text-left border-collapse">
                                             <thead className="bg-gray-100 border-b border-gray-200 text-gray-700">
-                                                <tr><th className="p-4 font-black">Obra</th><th className="p-4 font-black">Leitor (Reg)</th><th className="p-4 font-black">Data Início</th><th className="p-4 font-black">Status Atual</th></tr>
+                                                <tr><th className="p-4 font-black">Obra</th><th className="p-4 font-black">Leitor (Reg)</th><th className="p-4 font-black">Status Atual</th></tr>
                                             </thead>
                                             <tbody className="text-sm">
                                                 {allBooks.map(b => {
@@ -820,10 +772,7 @@
                                                         <tr key={b.dbId} className="border-b hover:bg-gray-50">
                                                             <td className="p-4 font-bold text-gray-800">{b.title} <span className="text-xs text-gray-500 font-normal block">{b.author}</span></td>
                                                             <td className="p-4">{u?.nome} <span className="text-xs text-gray-500 block">{u?.registro}</span></td>
-                                                            <td className="p-4">{new Date(b.date).toLocaleDateString('pt-BR')}</td>
-                                                            <td className="p-4">
-                                                                <span className={`px-3 py-1 rounded-full text-xs font-black ${b.status === 'Lendo' ? 'bg-blue-100 text-blue-700' : b.status === 'Lido' ? 'bg-yellow-100 text-yellow-700' : b.status === 'Resumo Agendado' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>{b.status}</span>
-                                                            </td>
+                                                            <td className="p-4"><span className={`px-3 py-1 rounded-full text-xs font-black ${b.status === 'Lendo' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>{b.status}</span></td>
                                                         </tr>
                                                     )
                                                 })}
@@ -835,21 +784,31 @@
 
                             {activeTab === 'leitores' && (
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                    <div className="md:col-span-1 bg-gray-50 p-6 rounded-2xl border border-gray-200">
-                                        <h3 className="font-black text-red-600 mb-4"><i className="fas fa-gavel mr-2"></i> Aplicar Infração</h3>
-                                        <form onSubmit={handleInfracao} className="space-y-4">
-                                            <div><label className="block text-xs font-bold mb-1">Registro do Leitor</label><input type="text" required value={infracaoData.userId} onChange={e => setInfracaoData({...infracaoData, userId: e.target.value})} className="w-full p-3 rounded-lg border outline-none font-medium" placeholder="Ex: RSO-123456" /></div>
-                                            <div><label className="block text-xs font-bold mb-1">Motivo / Regra Quebrada</label><input type="text" required value={infracaoData.motivo} onChange={e => setInfracaoData({...infracaoData, motivo: e.target.value})} className="w-full p-3 rounded-lg border outline-none font-medium" /></div>
-                                            <div><label className="block text-xs font-bold mb-1">Pontos a Descontar</label><input type="number" required value={infracaoData.pontos} onChange={e => setInfracaoData({...infracaoData, pontos: e.target.value})} className="w-full p-3 rounded-lg border outline-none font-medium" placeholder="Ex: 20" /></div>
-                                            <button type="submit" className="w-full bg-red-600 text-white font-black py-3 rounded-lg hover:bg-red-700"><i className="fas fa-minus-circle mr-2"></i> Descontar Pontos</button>
-                                        </form>
+                                    <div className="md:col-span-1 space-y-6">
+                                        <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200">
+                                            <h3 className="font-black text-red-600 mb-4"><i className="fas fa-gavel mr-2"></i> Aplicar Infração</h3>
+                                            <form onSubmit={handleInfracao} className="space-y-4">
+                                                <div><label className="block text-xs font-bold mb-1">Registro do Leitor</label><input type="text" required value={infracaoData.userId} onChange={e => setInfracaoData({...infracaoData, userId: e.target.value})} className="w-full p-3 rounded-lg border outline-none" placeholder="Ex: RSO-123456" /></div>
+                                                <div><label className="block text-xs font-bold mb-1">Motivo</label><input type="text" required value={infracaoData.motivo} onChange={e => setInfracaoData({...infracaoData, motivo: e.target.value})} className="w-full p-3 rounded-lg border outline-none" /></div>
+                                                <div><label className="block text-xs font-bold mb-1">Pontos a Descontar</label><input type="number" required value={infracaoData.pontos} onChange={e => setInfracaoData({...infracaoData, pontos: e.target.value})} className="w-full p-3 rounded-lg border outline-none" placeholder="Ex: 20" /></div>
+                                                <button type="submit" className="w-full bg-red-600 text-white font-black py-3 rounded-lg hover:bg-red-700"><i className="fas fa-minus-circle mr-2"></i> Descontar</button>
+                                            </form>
+                                        </div>
+                                        <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
+                                            <h3 className="font-black text-blue-800 mb-4"><i className="fas fa-star mr-2"></i> Registrar Evento</h3>
+                                            <form onSubmit={handleEvent} className="space-y-4">
+                                                <div><label className="block text-xs font-bold mb-1 text-blue-800">Registro do Leitor</label><input type="text" required value={eventData.userId} onChange={e => setEventData({...eventData, userId: e.target.value})} className="w-full p-3 rounded-lg border outline-none" /></div>
+                                                <div><label className="block text-xs font-bold mb-1 text-blue-800">Nome do Evento</label><input type="text" required value={eventData.nome} onChange={e => setEventData({...eventData, nome: e.target.value})} className="w-full p-3 rounded-lg border outline-none" /></div>
+                                                <button type="submit" className="w-full bg-blue-600 text-white font-black py-3 rounded-lg hover:bg-blue-700"><i className="fas fa-plus-circle mr-2"></i> Dar Pontos (+30)</button>
+                                            </form>
+                                        </div>
                                     </div>
                                     <div className="md:col-span-2">
                                         <h3 className="font-black text-[#003b49] mb-4"><i className="fas fa-users-cog mr-2"></i> Base de Leitores Inscritos</h3>
                                         <div className="overflow-x-auto rounded-xl border border-gray-200 h-96 overflow-y-auto">
                                             <table className="w-full text-left border-collapse">
                                                 <thead className="bg-gray-100 border-b border-gray-200 text-gray-700 sticky top-0">
-                                                    <tr><th className="p-3 font-black text-sm">Leitor</th><th className="p-3 font-black text-sm">Contato</th><th className="p-3 font-black text-sm text-right">Ação</th></tr>
+                                                    <tr><th className="p-3 font-black text-sm">Leitor</th><th className="p-3 font-black text-sm text-right">Ação</th></tr>
                                                 </thead>
                                                 <tbody className="text-sm">
                                                     {users.map(u => (
@@ -859,7 +818,6 @@
                                                                 <div className="text-xs text-gray-500">Reg: {u.registro} | CPF: {u.documento}</div>
                                                                 {u.nomeResponsavel && <div className="text-xs text-orange-600 font-bold mt-1">Resp: {u.nomeResponsavel}</div>}
                                                             </td>
-                                                            <td className="p-3 text-gray-600 font-medium">{u.telefone}</td>
                                                             <td className="p-3 text-right">
                                                                 <button onClick={() => handleDeleteUser(u)} className="text-red-500 hover:text-red-700 font-black text-xs bg-red-100 px-3 py-2 rounded-lg"><i className="fas fa-trash-alt"></i> Excluir</button>
                                                             </td>
@@ -871,7 +829,6 @@
                                     </div>
                                 </div>
                             )}
-
                         </div>
                     </main>
                 </div>
