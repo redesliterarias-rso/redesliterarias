@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Desafio Redes Literárias - Biblioteca Délio Ledoux</title>
     
-    <!-- Servidores ultra-estáveis para nunca mais dar tela branca por falha de carregamento -->
+    <!-- Servidores ultrarrápidos e estáveis (Cloudflare) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/17.0.2/umd/react.production.min.js"></script>
@@ -14,7 +14,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-    <!-- Firebase Compat SDK (Mais compatível com celulares antigos) -->
+    <!-- Firebase Compat SDK (Máxima estabilidade para celulares de todas as gerações) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
@@ -34,8 +34,8 @@
             if(root) {
                 root.innerHTML = `
                 <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #f8d7da; color: #721c24; padding: 20px; text-align: center; font-family: sans-serif;">
-                    <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">Ops! Falha de Conexão.</h1>
-                    <p style="font-size: 16px; margin-bottom: 20px;">O seu navegador ou internet bloqueou um arquivo importante.</p>
+                    <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">Ops! Oscilação na Conexão.</h1>
+                    <p style="font-size: 16px; margin-bottom: 20px;">O navegador bloqueou um arquivo por instabilidade de rede.</p>
                     <div style="background: white; padding: 10px; border-radius: 8px; color: #333; font-size: 12px; max-width: 100%; word-break: break-all; border: 1px solid #f5c6cb; margin-bottom: 20px;">
                         <strong>Detalhe Técnico:</strong> ` + event.message + `
                     </div>
@@ -51,7 +51,7 @@
     <script type="text/babel" data-presets="react">
         const { useState, useEffect, useRef } = React;
 
-        // Chaves Oficiais do Banco de Dados Firebase
+        // Chaves Oficiais do Banco de Dados Firebase (100% Corretas)
         const firebaseConfig = {
             apiKey: "AIzaSyBjGF-lwJt1Lk7zlEZou42zQRiUOfPlh24",
             authDomain: "redes-literarias-rso.firebaseapp.com",
@@ -67,7 +67,7 @@
 
         try {
             if (typeof firebase === 'undefined') {
-                throw new Error("Servidor do Google Firebase bloqueado.");
+                throw new Error("Servidor do Google Firebase bloqueado pela internet.");
             }
             if (!firebase.apps.length) {
                 firebase.initializeApp(firebaseConfig);
@@ -78,7 +78,7 @@
             firebaseInitError = error.message;
         }
 
-        // Tradutor Universal de Status (compatibiliza dados velhos e novos)
+        // Tradutor Universal de Status (compatibiliza dados velhos em inglês e novos em português)
         const tStatus = (s) => {
             if(!s) return 'Pendente';
             const map = {
@@ -145,7 +145,9 @@
                 }
 
                 const unsubscribeUsers = db.collection("users").onSnapshot(snapshot => {
-                    const usersData = snapshot.docs.map(doc => ({ dbId: doc.id, ...doc.data() }));
+                    const usersData = snapshot.docs.map(doc => {
+                        return { dbId: doc.id, ...doc.data() };
+                    });
                     setUsers(usersData);
                 }, err => {
                     console.error("Erro users:", err);
@@ -154,7 +156,9 @@
                 });
 
                 const unsubscribeActivities = db.collection("activities").onSnapshot(snapshot => {
-                    const actData = snapshot.docs.map(doc => ({ dbId: doc.id, ...doc.data() }));
+                    const actData = snapshot.docs.map(doc => {
+                        return { dbId: doc.id, ...doc.data() };
+                    });
                     setActivities(actData);
                     setLoading(false);
                 }, err => {
@@ -293,7 +297,7 @@
                                     {isOpen ? (
                                         <>
                                             <p className="text-sm font-bold text-gray-500 mb-3">Ainda não participa do desafio?</p>
-                                            <button onClick={() => setView('register')} className="w-full bg-brand-yellow text-brand-blue font-black py-4 rounded-xl hover:bg-yellow-500 shadow-md transform active:scale-95 transition text-lg">
+                                            <button onClick={() => setView('register')} type="button" className="w-full bg-brand-yellow text-brand-blue font-black py-4 rounded-xl hover:bg-yellow-500 shadow-md transform active:scale-95 transition text-lg">
                                                 FAZER INSCRIÇÃO AGORA
                                             </button>
                                         </>
@@ -332,7 +336,7 @@
                 );
             }
 
-            // O Compressor Mágico de Imagens - Impede que o Firestore trave com fotos pesadas
+            // O Compressor Mágico de Imagens
             const handleImage = (e) => {
                 const file = e.target.files[0];
                 if (file) {
@@ -350,7 +354,6 @@
                             let width = img.width;
                             let height = img.height;
                             
-                            // Redimensiona proporcionalmente
                             if (width > height) {
                                 if (width > MAX_WIDTH) {
                                     height = Math.round(height *= MAX_WIDTH / width);
@@ -368,7 +371,6 @@
                             const ctx = canvas.getContext('2d');
                             ctx.drawImage(img, 0, 0, width, height);
                             
-                            // Transforma numa imagem ultra leve em JPEG (70% de qualidade)
                             const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
                             setFoto(dataUrl);
                         };
@@ -383,7 +385,6 @@
                 e.preventDefault();
                 setMsg('');
                 
-                // Cálculo de idade perfeito (considera dia e mês)
                 const parts = form.nascimento.split('-');
                 if(parts.length !== 3) {
                     setMsg('Formato de data inválido.'); return;
@@ -539,8 +540,13 @@
             const myBooks = userActs.filter(a => a.type === 'book');
             const activeCheckin = userActs.find(a => a.type === 'checkin' && (a.status === 'active' || a.status === 'Em Andamento' || a.status === 'Lendo na Biblioteca'));
             
-            // Soma pontos garantindo compatibilidade com registros antigos e novos
+            // Calculadora Matemática Absoluta de Pontos
             const totalPoints = userActs.reduce((sum, act) => {
+                // Livros que ainda não tem o resumo aprovado garantem 10 pontos de imediato
+                if (act.type === 'book' && (act.status === 'Lendo' || act.status === 'Lido' || act.status === 'Agendado' || act.status === 'pending')) {
+                    return sum + 10;
+                }
+                // Atividades aprovadas (check-ins, eventos) e Resumos Aprovados (que já valem 60 pontos juntos)
                 if (act.status === 'approved' || act.status === 'Resumo Aprovado') {
                     return sum + (Number(act.points) || 0);
                 }
@@ -623,7 +629,7 @@
                     year: bookForm.ano,
                     stars: bookForm.avaliacao,
                     date: new Date().toISOString(),
-                    points: 10
+                    points: 10 // O aluno garante 10 pontos iniciais
                 }).then(() => {
                     showMsg(`Parabéns! O livro "${bookForm.titulo}" foi adicionado. (+10 pts)`);
                     setBookForm({ titulo: '', autor: '', ano: '', avaliacao: 5 });
@@ -710,7 +716,8 @@
                                                 </p>
                                             </div>
                                             <div className={`font-black text-sm px-4 py-2 rounded-xl shadow-sm border ${(act.status === 'approved' || act.status === 'Resumo Aprovado') ? 'bg-green-100 text-green-700 border-green-300' : 'bg-white text-gray-600 border-gray-300'}`}>
-                                                {act.points > 0 ? `+${act.points} pts` : tStatus(act.status)}
+                                                {act.type === 'book' && act.status !== 'Resumo Aprovado' ? `+10 pts` : 
+                                                 act.points > 0 ? `+${act.points} pts` : tStatus(act.status)}
                                             </div>
                                         </div>
                                     ))}
@@ -851,15 +858,26 @@
             };
 
             const ranking = users.map(u => {
-                const acts = activities.filter(a => a.userId === u.dbId && (a.status === 'approved' || a.status === 'Resumo Aprovado'));
-                const pts = acts.reduce((sum, a) => sum + (Number(a.points) || 0), 0);
-                const infractions = activities.filter(a=> a.type === 'infraction' && a.userId === u.dbId).reduce((sum, a) => sum + (Number(a.points) || 0), 0);
+                const acts = activities.filter(a => a.userId === u.dbId);
+                let pts = 0;
+                acts.forEach(act => {
+                    // Soma os pontos iniciais de quem apenas registrou livro (10 pts)
+                    if (act.type === 'book' && (act.status === 'Lendo' || act.status === 'Lido' || act.status === 'Agendado' || act.status === 'pending')) {
+                        pts += 10;
+                    } 
+                    // Soma os pontos finais (Resumo 60 pts ou Eventos/Checkins)
+                    else if (act.status === 'approved' || act.status === 'Resumo Aprovado') {
+                        pts += (Number(act.points) || 0);
+                    }
+                });
+                const infractions = acts.filter(a=> a.type === 'infraction').reduce((sum, a) => sum + (Number(a.points) || 0), 0);
                 return { ...u, points: pts - infractions };
             }).sort((a,b) => b.points - a.points);
 
             const handleApproveSummary = (act) => {
+                // Atualiza o livro para Resumo Aprovado e consagra 60 pontos totais (10 iniciais + 50 pelo resumo)
                 const promise = act.type === 'book' 
-                    ? db.collection("activities").doc(act.dbId).update({ status: 'Resumo Aprovado', points: 50 })
+                    ? db.collection("activities").doc(act.dbId).update({ status: 'Resumo Aprovado', points: 60 })
                     : db.collection("activities").doc(act.dbId).update({ status: 'approved' });
                 
                 promise.then(() => {
@@ -892,7 +910,7 @@
 
             const handleExportExcel = () => {
                 if (typeof XLSX === 'undefined') {
-                    showMsg("Ferramenta de Excel carregando, tente de novo.", "error");
+                    showMsg("Aguarde a ferramenta de Excel carregar.", "error");
                     return;
                 }
                 const wb = XLSX.utils.book_new();
