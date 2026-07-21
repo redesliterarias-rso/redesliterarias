@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Desafio Redes Literárias</title>
+    <title>Desafio Redes Literárias - Biblioteca Délio Ledoux</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -13,7 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 
-    <!-- Firebase -->
+    <!-- Firebase Compat SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
@@ -42,14 +42,24 @@
             appId: "1:469426150346:web:bec753b21cf64b7eca8d33"
         };
         
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        const db = firebase.firestore();
+        let db = null;
+        let firebaseInitError = null;
 
-        // Tradutor Universal para mesclar banco antigo (inglês) e novo (português)
+        try {
+            if (typeof firebase === 'undefined') {
+                throw new Error("O servidor do Google Firebase foi bloqueado pelo seu navegador ou internet.");
+            }
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            db = firebase.firestore();
+        } catch (error) {
+            console.error("Erro Crítico no Firebase:", error);
+            firebaseInitError = error.message;
+        }
+
         const tStatus = (s) => {
-            if(!s) return '';
+            if(!s) return 'Pendente';
             const map = {
                 'pending': 'Pendente',
                 'approved': 'Aprovado',
@@ -76,7 +86,7 @@
             }
             static getDerivedStateFromError(error) { return { hasError: true }; }
             componentDidCatch(error, errorInfo) {
-                console.error("Erro capturado:", error, errorInfo);
+                console.error("Erro capturado para evitar tela branca:", error, errorInfo);
                 this.setState({ errorInfo: error.toString() });
             }
             render() {
@@ -84,12 +94,12 @@
                     return (
                         <div className="min-h-screen flex flex-col items-center justify-center bg-red-50 p-6 text-center">
                             <i className="fas fa-exclamation-triangle text-red-500 text-6xl mb-4"></i>
-                            <h1 className="text-2xl font-black text-red-800 mb-2">Ops! Algo deu errado.</h1>
-                            <p className="text-red-600 font-medium mb-6">Não se preocupe, seus dados estão salvos. Tire um print desta tela e mostre ao suporte técnico:</p>
-                            <div className="bg-white p-4 rounded-xl border border-red-200 text-left text-sm text-gray-700 w-full max-w-lg overflow-auto">
+                            <h1 className="text-2xl font-black text-red-800 mb-2">Pequeno erro de exibição contornado!</h1>
+                            <p className="text-red-600 font-medium mb-6">Seus dados estão seguros. Apenas ocorreu um conflito visual no seu celular.</p>
+                            <div className="bg-white p-4 rounded-xl border border-red-200 text-left text-sm text-gray-700 w-full max-w-lg overflow-auto mb-6">
                                 {this.state.errorInfo}
                             </div>
-                            <button onClick={() => window.location.reload()} className="mt-6 bg-red-600 text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:bg-red-700">Recarregar Página</button>
+                            <button onClick={() => window.location.reload()} className="bg-red-600 text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:bg-red-700">Recarregar Página</button>
                         </div>
                     );
                 }
@@ -106,12 +116,19 @@
             const [dbError, setDbError] = useState(false);
 
             useEffect(() => {
+                if (firebaseInitError || !db) {
+                    setDbError(true);
+                    setLoading(false);
+                    return;
+                }
+
                 const unsubscribeUsers = db.collection("users").onSnapshot(snapshot => {
                     const usersData = snapshot.docs.map(doc => ({ dbId: doc.id, ...doc.data() }));
                     setUsers(usersData);
                 }, err => {
-                    console.error("Erro users:", err);
+                    console.error("Erro ao ler users:", err);
                     setDbError(true);
+                    setLoading(false);
                 });
 
                 const unsubscribeActivities = db.collection("activities").onSnapshot(snapshot => {
@@ -119,14 +136,14 @@
                     setActivities(actData);
                     setLoading(false);
                 }, err => {
-                    console.error("Erro activities:", err);
+                    console.error("Erro ao ler activities:", err);
                     setDbError(true);
                     setLoading(false);
                 });
 
                 return () => {
-                    unsubscribeUsers();
-                    unsubscribeActivities();
+                    if(unsubscribeUsers) unsubscribeUsers();
+                    if(unsubscribeActivities) unsubscribeActivities();
                 };
             }, []);
 
@@ -134,16 +151,16 @@
                 <div className="h-screen flex flex-col items-center justify-center bg-red-50 p-6 text-center">
                     <i className="fas fa-database text-red-500 text-6xl mb-4"></i>
                     <h1 className="text-2xl font-black text-red-800 mb-2">Conexão Bloqueada</h1>
-                    <p className="text-red-600 font-medium mb-6 max-w-md">As permissões de 30 dias do Firebase expiraram. Acesse o Console do Firebase, vá em <strong>Firestore Database > Regras</strong> e altere para <code>allow read, write: if true;</code> e publique.</p>
+                    <p className="text-red-600 font-medium mb-6 max-w-md">As regras do banco expiraram ou sua internet bloqueou o Google Firebase. Acesse o Console do Firebase &gt; Firestore Database &gt; Regras, adicione <code>allow read, write: if true;</code> e publique.</p>
                 </div>
             );
 
-            if (loading) return <div className="h-screen flex flex-col items-center justify-center bg-brand-blue text-white font-bold text-xl"><i className="fas fa-spinner fa-spin text-4xl mb-4 text-brand-yellow"></i> Conectando ao Banco de Dados...</div>;
+            if (loading) return <div className="h-screen flex flex-col items-center justify-center bg-brand-blue text-white font-bold text-xl"><i className="fas fa-spinner fa-spin text-4xl mb-4 text-brand-yellow"></i> Conectando à nuvem de forma segura...</div>;
 
             if (view === 'login') return <LoginScreen setView={setView} users={users} setCurrentUser={setCurrentUser} />;
-            if (view === 'register') return <RegisterScreen setView={setView} />;
-            if (view === 'user') return <UserDashboard user={currentUser} setView={setView} activities={activities} />;
-            if (view === 'admin') return <AdminDashboard setView={setView} users={users} activities={activities} />;
+            if (view === 'register') return <RegisterScreen setView={setView} db={db} />;
+            if (view === 'user') return <UserDashboard user={currentUser} setView={setView} activities={activities} db={db} />;
+            if (view === 'admin') return <AdminDashboard setView={setView} users={users} activities={activities} db={db} />;
             
             return <div>Erro de Rota</div>;
         }
@@ -155,9 +172,10 @@
             const [password, setPassword] = useState('');
             const [msg, setMsg] = useState('');
             
-            const deadline = new Date('2026-07-31T23:59:59-03:00');
+            // Usando Data super segura para não quebrar no iPhone antigo
+            const deadline = new Date(2026, 6, 31, 23, 59, 59); // 31 de Julho de 2026
             const now = new Date();
-            const isOpen = now <= deadline;
+            const isOpen = now.getTime() <= deadline.getTime();
 
             const handleLogin = (e) => {
                 e.preventDefault();
@@ -246,16 +264,17 @@
             );
         }
 
-        function RegisterScreen({ setView }) {
+        function RegisterScreen({ setView, db }) {
             const [form, setForm] = useState({ nome: '', documento: '', nascimento: '', endereco: '', telefone: '', respNome: '', respDoc: '', respTel: '' });
             const [foto, setFoto] = useState(null);
             const [msg, setMsg] = useState('');
             const [loading, setLoading] = useState(false);
+            const [successData, setSuccessData] = useState(null); // Substitui o Alert() problemático
             
-            const deadline = new Date('2026-07-31T23:59:59-03:00');
+            const deadline = new Date(2026, 6, 31, 23, 59, 59);
             const now = new Date();
             
-            if (now > deadline) {
+            if (now.getTime() > deadline.getTime()) {
                 return (
                     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
                         <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md text-center">
@@ -281,7 +300,11 @@
                 e.preventDefault();
                 setMsg('');
                 
-                const nasc = new Date(form.nascimento);
+                const parts = form.nascimento.split('-');
+                if(parts.length !== 3) {
+                    setMsg('Formato de data inválido.'); return;
+                }
+                const nasc = new Date(parts[0], parts[1]-1, parts[2]);
                 const age = new Date().getFullYear() - nasc.getFullYear();
                 
                 if (age < 11) {
@@ -310,13 +333,33 @@
                         status: 'active',
                         createdAt: new Date().toISOString()
                     });
-                    alert(`Cadastro Realizado com Sucesso!\nSeu número de registro é ${registro}\nUse-o para fazer login e baixar sua carteirinha.`);
-                    setView('login');
+                    
+                    // Mostramos sucesso via Modal customizado, NUNCA via window.alert()
+                    setSuccessData(registro);
                 } catch (err) {
                     setMsg('Erro de conexão ao salvar. Verifique sua internet.');
                     setLoading(false);
                 }
             };
+
+            if (successData) {
+                return (
+                    <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center">
+                        <div className="bg-white rounded-3xl shadow-2xl p-8 text-center max-w-md border-t-8 border-green-500">
+                            <i className="fas fa-check-circle text-6xl text-green-500 mb-4"></i>
+                            <h2 className="text-2xl font-black text-gray-800 mb-4">Inscrição de Sucesso!</h2>
+                            <p className="text-gray-600 font-medium mb-4">Anote agora mesmo o seu número de registro oficial:</p>
+                            <div className="bg-green-50 border border-green-200 text-green-800 text-3xl font-black py-4 rounded-xl mb-6">
+                                {successData}
+                            </div>
+                            <p className="text-sm text-gray-500 mb-6">Você usará este número para fazer login e baixar sua carteirinha.</p>
+                            <button onClick={() => setView('login')} className="w-full bg-brand-blue text-white font-black py-4 rounded-xl hover:bg-opacity-90 shadow-lg">
+                                ACESSAR MEU PAINEL AGORA
+                            </button>
+                        </div>
+                    </div>
+                )
+            }
 
             return (
                 <div className="min-h-screen bg-gray-100 p-4 py-8">
@@ -397,7 +440,7 @@
             );
         }
 
-        function UserDashboard({ user, setView, activities }) {
+        function UserDashboard({ user, setView, activities, db }) {
             const [tab, setTab] = useState('home');
             const [msg, setMsg] = useState({ text: '', type: '' });
             const [bookForm, setBookForm] = useState({ titulo: '', autor: '', ano: '', avaliacao: 5 });
@@ -409,7 +452,6 @@
             const myBooks = userActs.filter(a => a.type === 'book');
             const activeCheckin = userActs.find(a => a.type === 'checkin' && (a.status === 'active' || a.status === 'Em Andamento'));
             
-            // Soma universal de pontos
             const totalPoints = userActs.reduce((sum, act) => {
                 if (act.status === 'approved' || act.status === 'Resumo Aprovado') {
                     return sum + (Number(act.points) || 0);
@@ -423,12 +465,14 @@
             };
 
             const handleDownloadCard = () => {
-                html2canvas(cardRef.current, { scale: 2, useCORS: true, backgroundColor: null }).then(canvas => {
-                    const link = document.createElement('a');
-                    link.download = `Carteirinha-${user.registro}.png`;
-                    link.href = canvas.toDataURL('image/png');
-                    link.click();
-                });
+                if(cardRef.current) {
+                    html2canvas(cardRef.current, { scale: 2, useCORS: true, backgroundColor: null }).then(canvas => {
+                        const link = document.createElement('a');
+                        link.download = `Carteirinha-${user.registro}.png`;
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                    });
+                }
             };
 
             const calculatePoints = (minutes) => {
@@ -534,7 +578,7 @@
                         <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-200">
                             <div ref={cardRef} className="relative p-6 bg-brand-blue text-white flex flex-col items-center">
                                 <div className="absolute top-0 w-full h-24 bg-brand-yellow rounded-b-[50px] opacity-20"></div>
-                                <img src={user.foto} className="w-24 h-24 rounded-full border-4 border-brand-yellow shadow-lg z-10 object-cover bg-white" />
+                                <img src={user.foto} crossOrigin="anonymous" className="w-24 h-24 rounded-full border-4 border-brand-yellow shadow-lg z-10 object-cover bg-white" />
                                 <h2 className="text-2xl font-black mt-4 z-10 text-center">{user.nome}</h2>
                                 <p className="text-brand-yellow font-bold z-10 mt-1 bg-black bg-opacity-30 px-4 py-1 rounded-full"><i className="fas fa-id-badge mr-1"></i> {user.registro}</p>
                                 <div className="w-full flex justify-between mt-6 bg-black bg-opacity-20 p-4 rounded-xl z-10 backdrop-blur-sm border border-gray-600">
@@ -699,10 +743,11 @@
             );
         }
 
-        function AdminDashboard({ setView, users, activities }) {
+        function AdminDashboard({ setView, users, activities, db }) {
             const [tab, setTab] = useState('resumos');
             const [msg, setMsg] = useState({text:'', type:''});
             const [eventData, setEventData] = useState({ cpf: '', nomeEvento: '' });
+            const [deleteConfirm, setDeleteConfirm] = useState(null); // Substitui window.confirm
 
             const showMsg = (text, type = 'success') => {
                 setMsg({ text, type });
@@ -717,12 +762,9 @@
             }).sort((a,b) => b.points - a.points);
 
             const handleApproveSummary = async (act) => {
-                // Se foi agendado na forma nova, atualiza o status do Livro
                 if (act.type === 'book') {
                     await db.collection("activities").doc(act.dbId).update({ status: 'Resumo Aprovado', points: 50 });
-                } 
-                // Se foi agendado na forma antiga, atualiza o status da atividade 'summary'
-                else {
+                } else {
                     await db.collection("activities").doc(act.dbId).update({ status: 'approved' });
                 }
                 showMsg('Resumo Aprovado! 50 pontos adicionados ao leitor.');
@@ -737,10 +779,11 @@
                 setEventData({cpf:'', nomeEvento:''});
             };
 
-            const handleDeleteUser = async (userId) => {
-                if(confirm("Tem certeza que deseja apagar este leitor e todas as atividades dele?")) {
-                    await db.collection("users").doc(userId).delete();
-                    showMsg("Leitor excluído por segurança.");
+            const executeDeleteUser = async () => {
+                if(deleteConfirm) {
+                    await db.collection("users").doc(deleteConfirm).delete();
+                    showMsg("Leitor excluído com sucesso.");
+                    setDeleteConfirm(null);
                 }
             };
 
@@ -763,6 +806,20 @@
                         </div>
                     </header>
 
+                    {deleteConfirm && (
+                        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[100] p-4">
+                            <div className="bg-white p-8 rounded-3xl max-w-md w-full text-center shadow-2xl">
+                                <i className="fas fa-exclamation-triangle text-red-500 text-5xl mb-4"></i>
+                                <h3 className="text-xl font-black mb-2">Excluir Leitor?</h3>
+                                <p className="text-gray-600 mb-6 font-bold">Esta ação não pode ser desfeita e os pontos serão perdidos.</p>
+                                <div className="flex gap-4">
+                                    <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-3 bg-gray-200 text-gray-700 font-bold rounded-xl">Cancelar</button>
+                                    <button onClick={executeDeleteUser} className="flex-1 py-3 bg-red-600 text-white font-black rounded-xl hover:bg-red-700">Sim, Excluir</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <main className="max-w-6xl mx-auto mt-6 px-4">
                         <div className="flex flex-wrap bg-white rounded-xl shadow-sm mb-6 overflow-hidden border">
                             <button onClick={()=>setTab('resumos')} className={`flex-1 min-w-[120px] py-3 px-2 font-bold text-sm ${tab==='resumos' ? 'bg-brand-blue text-white':'text-gray-600 hover:bg-gray-50'}`}>Resumos Agendados</button>
@@ -779,7 +836,6 @@
                                 <div>
                                     <h2 className="text-2xl font-black text-brand-blue mb-6">Aprovar Entregas de Resumo</h2>
                                     {(() => {
-                                        // Puxa tanto os agendamentos antigos (summary) quanto os novos (Agendado)
                                         const pendingSummaries = activities.filter(a => a.status === 'Agendado' || (a.type === 'summary' && a.status === 'pending'));
                                         
                                         if (pendingSummaries.length === 0) return <p className="text-gray-500 font-bold p-8 text-center bg-gray-50 rounded-xl border-2 border-dashed">Nenhum agendamento pendente.</p>;
@@ -883,7 +939,7 @@
                                                         <td className="p-4"><p className="font-bold text-gray-800">{u.nome}</p><p className="text-xs text-gray-500 font-bold mt-1 bg-gray-200 inline-block px-2 rounded">{u.registro} | {u.telefone}</p></td>
                                                         <td className="p-4 text-xs font-bold text-gray-600">{u.respNome ? `${u.respNome} (${u.respTel})` : 'Maior de Idade'}</td>
                                                         <td className="p-4">
-                                                            <button onClick={() => handleDeleteUser(u.dbId)} className="bg-red-100 text-red-600 font-black px-4 py-2 rounded-lg hover:bg-red-200 text-xs shadow-sm"><i className="fas fa-trash-alt mr-1"></i> Excluir</button>
+                                                            <button onClick={() => setDeleteConfirm(u.dbId)} className="bg-red-100 text-red-600 font-black px-4 py-2 rounded-lg hover:bg-red-200 text-xs shadow-sm"><i className="fas fa-trash-alt mr-1"></i> Excluir</button>
                                                         </td>
                                                     </tr>
                                                 ))}
