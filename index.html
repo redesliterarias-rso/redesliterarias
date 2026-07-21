@@ -9,7 +9,6 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
-    <!-- ATUALIZAÇÃO CRÍTICA: Babel atualizado para versão 7 (Evita Tela Branca em celulares) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -48,14 +47,34 @@
         }
         const db = firebase.firestore();
 
+        // Tradutor Universal para mesclar banco antigo (inglês) e novo (português)
+        const tStatus = (s) => {
+            if(!s) return '';
+            const map = {
+                'pending': 'Pendente',
+                'approved': 'Aprovado',
+                'active': 'Lendo na Biblioteca',
+                'blocked': 'Bloqueado',
+                'lendo': 'Lendo',
+                'lido': 'Lido',
+                'agendado': 'Agendado',
+                'resumo aprovado': 'Resumo Aprovado'
+            };
+            return map[s.toLowerCase()] || s;
+        };
+
+        const tType = (t) => {
+            if(!t) return '';
+            const map = { 'book': 'Livro', 'summary': 'Resumo', 'event': 'Evento', 'checkin': 'Presença' };
+            return map[t.toLowerCase()] || t;
+        };
+
         class ErrorBoundary extends React.Component {
             constructor(props) {
                 super(props);
                 this.state = { hasError: false, errorInfo: null };
             }
-            static getDerivedStateFromError(error) {
-                return { hasError: true };
-            }
+            static getDerivedStateFromError(error) { return { hasError: true }; }
             componentDidCatch(error, errorInfo) {
                 console.error("Erro capturado:", error, errorInfo);
                 this.setState({ errorInfo: error.toString() });
@@ -84,12 +103,16 @@
             const [users, setUsers] = useState([]);
             const [activities, setActivities] = useState([]);
             const [loading, setLoading] = useState(true);
+            const [dbError, setDbError] = useState(false);
 
             useEffect(() => {
                 const unsubscribeUsers = db.collection("users").onSnapshot(snapshot => {
                     const usersData = snapshot.docs.map(doc => ({ dbId: doc.id, ...doc.data() }));
                     setUsers(usersData);
-                }, err => console.error("Erro users:", err));
+                }, err => {
+                    console.error("Erro users:", err);
+                    setDbError(true);
+                });
 
                 const unsubscribeActivities = db.collection("activities").onSnapshot(snapshot => {
                     const actData = snapshot.docs.map(doc => ({ dbId: doc.id, ...doc.data() }));
@@ -97,6 +120,7 @@
                     setLoading(false);
                 }, err => {
                     console.error("Erro activities:", err);
+                    setDbError(true);
                     setLoading(false);
                 });
 
@@ -106,7 +130,15 @@
                 };
             }, []);
 
-            if (loading) return <div className="h-screen flex flex-col items-center justify-center bg-brand-blue text-white font-bold text-xl"><i className="fas fa-spinner fa-spin text-4xl mb-4 text-brand-yellow"></i> Conectando ao Banco de Dados Seguro...</div>;
+            if (dbError) return (
+                <div className="h-screen flex flex-col items-center justify-center bg-red-50 p-6 text-center">
+                    <i className="fas fa-database text-red-500 text-6xl mb-4"></i>
+                    <h1 className="text-2xl font-black text-red-800 mb-2">Conexão Bloqueada</h1>
+                    <p className="text-red-600 font-medium mb-6 max-w-md">As permissões de 30 dias do Firebase expiraram. Acesse o Console do Firebase, vá em <strong>Firestore Database > Regras</strong> e altere para <code>allow read, write: if true;</code> e publique.</p>
+                </div>
+            );
+
+            if (loading) return <div className="h-screen flex flex-col items-center justify-center bg-brand-blue text-white font-bold text-xl"><i className="fas fa-spinner fa-spin text-4xl mb-4 text-brand-yellow"></i> Conectando ao Banco de Dados...</div>;
 
             if (view === 'login') return <LoginScreen setView={setView} users={users} setCurrentUser={setCurrentUser} />;
             if (view === 'register') return <RegisterScreen setView={setView} />;
@@ -123,7 +155,6 @@
             const [password, setPassword] = useState('');
             const [msg, setMsg] = useState('');
             
-            // Prazo final: 31 de Julho de 2026 às 23:59
             const deadline = new Date('2026-07-31T23:59:59-03:00');
             const now = new Date();
             const isOpen = now <= deadline;
@@ -376,9 +407,15 @@
 
             const userActs = activities.filter(a => a.userId === user.dbId);
             const myBooks = userActs.filter(a => a.type === 'book');
-            const activeCheckin = userActs.find(a => a.type === 'checkin' && a.status === 'active');
+            const activeCheckin = userActs.find(a => a.type === 'checkin' && (a.status === 'active' || a.status === 'Em Andamento'));
             
-            const totalPoints = userActs.reduce((sum, act) => act.status === 'approved' || act.status === 'Resumo Aprovado' ? sum + (act.points || 0) : sum, 0);
+            // Soma universal de pontos
+            const totalPoints = userActs.reduce((sum, act) => {
+                if (act.status === 'approved' || act.status === 'Resumo Aprovado') {
+                    return sum + (Number(act.points) || 0);
+                }
+                return sum;
+            }, 0);
 
             const showMsg = (text, type = 'success') => {
                 setMsg({ text, type });
@@ -449,9 +486,9 @@
                     year: bookForm.ano,
                     stars: bookForm.avaliacao,
                     date: new Date().toISOString(),
-                    points: 0
+                    points: 10
                 });
-                showMsg(`Parabéns! O livro "${bookForm.titulo}" foi adicionado.`);
+                showMsg(`Parabéns! O livro "${bookForm.titulo}" foi adicionado. (+10 pts)`);
                 setBookForm({ titulo: '', autor: '', ano: '', avaliacao: 5 });
                 setTab('livros');
             };
@@ -464,12 +501,7 @@
             const handleScheduleSummary = async (e) => {
                 e.preventDefault();
                 if(!scheduleData.bookId || !scheduleData.date || !scheduleData.time) {
-                    showMsg("Preencha o livro, a data e o horário.", "error");
-                    return;
-                }
-                const d = new Date(scheduleData.date + 'T00:00:00');
-                if(d.getDay() < 2 || d.getDay() > 4) {
-                    showMsg("Agendamentos presenciais acontecem apenas de Terça a Quinta.", "error");
+                    showMsg("Preencha todos os campos do formulário de agendamento.", "error");
                     return;
                 }
 
@@ -507,7 +539,7 @@
                                 <p className="text-brand-yellow font-bold z-10 mt-1 bg-black bg-opacity-30 px-4 py-1 rounded-full"><i className="fas fa-id-badge mr-1"></i> {user.registro}</p>
                                 <div className="w-full flex justify-between mt-6 bg-black bg-opacity-20 p-4 rounded-xl z-10 backdrop-blur-sm border border-gray-600">
                                     <div className="text-center"><p className="text-xs text-gray-300 uppercase font-bold">Pontuação</p><p className="text-2xl font-black text-brand-yellow">{totalPoints} pts</p></div>
-                                    <div className="text-center"><p className="text-xs text-gray-300 uppercase font-bold">Livros Lidos</p><p className="text-2xl font-black text-brand-yellow">{myBooks.filter(b=>b.status !== 'Lendo').length}</p></div>
+                                    <div className="text-center"><p className="text-xs text-gray-300 uppercase font-bold">Livros Lidos</p><p className="text-2xl font-black text-brand-yellow">{myBooks.filter(b=>b.status === 'Lido' || b.status === 'Agendado' || b.status === 'Resumo Aprovado' || b.status === 'approved').length}</p></div>
                                 </div>
                             </div>
                             <button onClick={handleDownloadCard} className="w-full py-4 text-brand-blue font-black hover:bg-gray-50 flex items-center justify-center transition border-t"><i className="fas fa-download mr-2 text-xl"></i> Baixar Carteirinha Oficial</button>
@@ -532,13 +564,13 @@
                                             <div>
                                                 <p className="font-bold text-gray-800">{act.title}</p>
                                                 <p className="text-xs font-bold text-gray-500 uppercase mt-1">
-                                                    {act.type === 'book' ? `Status: ${act.status}` : 
+                                                    {act.type === 'book' ? `Status: ${tStatus(act.status)}` : 
                                                      act.type === 'checkin' ? `Presença (${act.minutes || 0} min)` : 
-                                                     act.type === 'event' ? 'Participação em Evento' : act.type}
+                                                     tType(act.type)}
                                                 </p>
                                             </div>
-                                            <div className={`font-black text-sm px-4 py-2 rounded-xl shadow-sm ${act.status === 'approved' || act.status === 'Resumo Aprovado' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-white border text-gray-600'}`}>
-                                                {act.points > 0 ? `+${act.points} pts` : act.status}
+                                            <div className={`font-black text-sm px-4 py-2 rounded-xl shadow-sm ${(act.status === 'approved' || act.status === 'Resumo Aprovado') ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-white border text-gray-600'}`}>
+                                                {act.points > 0 ? `+${act.points} pts` : tStatus(act.status)}
                                             </div>
                                         </div>
                                     ))}
@@ -602,12 +634,12 @@
                                             <div key={book.dbId} className="p-4 border-2 rounded-xl bg-gray-50 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                                                 <div>
                                                     <h4 className="font-black text-lg text-gray-800">{book.title}</h4>
-                                                    <p className="text-sm font-bold text-gray-500 mb-2">{book.author} | {book.year} | {'⭐'.repeat(book.stars)}</p>
-                                                    <span className={`text-xs font-black px-3 py-1 rounded-lg uppercase border ${book.status === 'Lido' || book.status === 'Agendado' || book.status === 'Resumo Aprovado' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-yellow-100 text-yellow-700 border-yellow-300'}`}>
-                                                        {book.status}
+                                                    <p className="text-sm font-bold text-gray-500 mb-2">{book.author} | {book.year} | {'⭐'.repeat(book.stars || 5)}</p>
+                                                    <span className={`text-xs font-black px-3 py-1 rounded-lg uppercase border ${(book.status === 'Lido' || book.status === 'Agendado' || book.status === 'Resumo Aprovado' || book.status === 'approved') ? 'bg-green-100 text-green-700 border-green-300' : 'bg-yellow-100 text-yellow-700 border-yellow-300'}`}>
+                                                        {tStatus(book.status)}
                                                     </span>
                                                 </div>
-                                                {book.status === 'Lendo' && (
+                                                {(book.status === 'Lendo' || book.status === 'pending') && (
                                                     <button onClick={() => handleUpdateBookStatus(book.dbId, 'Lido')} className="bg-green-500 text-white font-black px-4 py-3 rounded-xl hover:bg-green-600 shadow-sm shrink-0"><i className="fas fa-check mr-2"></i>Terminei de Ler</button>
                                                 )}
                                             </div>
@@ -628,13 +660,12 @@
                                         <li><strong>Dias:</strong> Terça a Quinta-feira</li>
                                         <li><strong>Horários:</strong> 09:00 às 17:30</li>
                                     </ul>
-                                    <p className="text-orange-900 font-black">Lembre-se: O resumo Aprovado vale MUITO ponto!</p>
                                 </div>
 
-                                {myBooks.filter(b => b.status === 'Lido').length === 0 ? (
+                                {myBooks.filter(b => b.status === 'Lido' || b.status === 'approved').length === 0 ? (
                                     <div className="text-center font-bold text-gray-500 p-8 bg-gray-50 rounded-2xl border-2 border-dashed">
                                         <i className="fas fa-book-open text-4xl mb-3 text-gray-300"></i>
-                                        <p>Você não tem livros com status "Lido" disponíveis para agendar o resumo.</p>
+                                        <p>Você não tem livros marcados como "Lido" para agendar resumo.</p>
                                         <button onClick={()=>setTab('livros')} className="mt-4 text-brand-blue underline">Ir para Minha Estante</button>
                                     </div>
                                 ) : (
@@ -643,7 +674,7 @@
                                             <label className="block text-sm font-bold text-gray-700 mb-2">Qual livro você quer resumir?</label>
                                             <select required value={scheduleData.bookId} onChange={e=>setScheduleData({...scheduleData, bookId: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-gray-50 font-bold outline-none focus:border-orange-500 text-lg">
                                                 <option value="">Selecione o Livro na lista...</option>
-                                                {myBooks.filter(b => b.status === 'Lido').map(b => <option key={b.dbId} value={b.dbId}>{b.title}</option>)}
+                                                {myBooks.filter(b => b.status === 'Lido' || b.status === 'approved').map(b => <option key={b.dbId} value={b.dbId}>{b.title}</option>)}
                                             </select>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
@@ -678,16 +709,22 @@
                 setTimeout(() => setMsg({ text: '', type: '' }), 4000);
             };
 
-            // CORREÇÃO CRÍTICA DE LÓGICA DE PONTOS
             const ranking = users.map(u => {
                 const acts = activities.filter(a => a.userId === u.dbId && (a.status === 'approved' || a.status === 'Resumo Aprovado'));
-                const pts = acts.reduce((sum, a) => sum + (a.points || 0), 0);
-                const infractions = acts.filter(a=> a.type === 'infraction').reduce((sum, a) => sum + (a.points || 0), 0);
+                const pts = acts.reduce((sum, a) => sum + (Number(a.points) || 0), 0);
+                const infractions = activities.filter(a=> a.type === 'infraction' && a.userId === u.dbId).reduce((sum, a) => sum + (Number(a.points) || 0), 0);
                 return { ...u, points: pts - infractions };
             }).sort((a,b) => b.points - a.points);
 
-            const handleApproveSummary = async (bookId) => {
-                await db.collection("activities").doc(bookId).update({ status: 'Resumo Aprovado', points: 50 });
+            const handleApproveSummary = async (act) => {
+                // Se foi agendado na forma nova, atualiza o status do Livro
+                if (act.type === 'book') {
+                    await db.collection("activities").doc(act.dbId).update({ status: 'Resumo Aprovado', points: 50 });
+                } 
+                // Se foi agendado na forma antiga, atualiza o status da atividade 'summary'
+                else {
+                    await db.collection("activities").doc(act.dbId).update({ status: 'approved' });
+                }
                 showMsg('Resumo Aprovado! 50 pontos adicionados ao leitor.');
             };
 
@@ -712,7 +749,7 @@
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ranking.map(u => ({ Nome: u.nome, Registro: u.registro, Idade: u.idade, Contato: u.telefone, Pontos: u.points }))), "Leitores");
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(activities.filter(a=>a.type==='book').map(b => {
                     const usr = users.find(u=> u.dbId === b.userId);
-                    return { Leitor: usr ? usr.nome : 'Excluído', Livro: b.title, Autor: b.author, Status: b.status, Avaliacao: b.stars };
+                    return { Leitor: usr ? usr.nome : 'Excluído', Livro: b.title, Autor: b.author, Status: tStatus(b.status), Avaliacao: b.stars };
                 })), "Livros");
                 XLSX.writeFile(wb, "Relatorio_Biblioteca_RedesLiterarias.xlsx");
             };
@@ -741,24 +778,33 @@
                             {tab === 'resumos' && (
                                 <div>
                                     <h2 className="text-2xl font-black text-brand-blue mb-6">Aprovar Entregas de Resumo</h2>
-                                    {activities.filter(a => a.status === 'Agendado').length === 0 ? <p className="text-gray-500 font-bold p-8 text-center bg-gray-50 rounded-xl border-2 border-dashed">Nenhum agendamento pendente.</p> :
-                                     activities.filter(a => a.status === 'Agendado').map(act => {
-                                        const u = users.find(usr => usr.dbId === act.userId);
-                                        return (
-                                            <div key={act.dbId} className="flex flex-col sm:flex-row justify-between sm:items-center p-6 border-2 rounded-xl mb-4 bg-orange-50 border-orange-200 shadow-sm gap-4">
-                                                <div>
-                                                    <p className="font-black text-xl text-gray-800">{u ? u.nome : 'Leitor Excluído'} <span className="text-sm text-gray-500 font-bold">({u ? u.registro : '---'})</span></p>
-                                                    <p className="font-bold text-gray-700 mt-1"><i className="fas fa-book text-orange-500 mr-2"></i> Livro: {act.title}</p>
-                                                    <p className="text-sm font-black text-orange-800 mt-3 bg-orange-200 inline-block px-4 py-2 rounded-lg shadow-sm">
-                                                        <i className="fas fa-calendar-alt mr-2"></i> AGENDADO PARA: {act.scheduleDate} às {act.scheduleTime}
-                                                    </p>
+                                    {(() => {
+                                        // Puxa tanto os agendamentos antigos (summary) quanto os novos (Agendado)
+                                        const pendingSummaries = activities.filter(a => a.status === 'Agendado' || (a.type === 'summary' && a.status === 'pending'));
+                                        
+                                        if (pendingSummaries.length === 0) return <p className="text-gray-500 font-bold p-8 text-center bg-gray-50 rounded-xl border-2 border-dashed">Nenhum agendamento pendente.</p>;
+                                        
+                                        return pendingSummaries.map(act => {
+                                            const u = users.find(usr => usr.dbId === act.userId);
+                                            const dateStr = act.scheduleDate || act.date || 'Sem data definida';
+                                            const timeStr = act.scheduleTime || act.time || 'Sem horário definido';
+                                            
+                                            return (
+                                                <div key={act.dbId} className="flex flex-col sm:flex-row justify-between sm:items-center p-6 border-2 rounded-xl mb-4 bg-orange-50 border-orange-200 shadow-sm gap-4">
+                                                    <div>
+                                                        <p className="font-black text-xl text-gray-800">{u ? u.nome : 'Leitor Excluído'} <span className="text-sm text-gray-500 font-bold">({u ? u.registro : '---'})</span></p>
+                                                        <p className="font-bold text-gray-700 mt-1"><i className="fas fa-book text-orange-500 mr-2"></i> {act.type === 'summary' ? 'Atividade: Resumo' : `Livro: ${act.title}`}</p>
+                                                        <p className="text-sm font-black text-orange-800 mt-3 bg-orange-200 inline-block px-4 py-2 rounded-lg shadow-sm">
+                                                            <i className="fas fa-calendar-alt mr-2"></i> AGENDADO PARA: {dateStr} às {timeStr}
+                                                        </p>
+                                                    </div>
+                                                    <button onClick={() => handleApproveSummary(act)} className="bg-green-600 text-white font-black py-4 px-8 rounded-xl hover:bg-green-700 shadow-md transform active:scale-95 text-lg w-full sm:w-auto">
+                                                        CONFIRMAR PRESENÇA E APROVAR (+50 pts)
+                                                    </button>
                                                 </div>
-                                                <button onClick={() => handleApproveSummary(act.dbId)} className="bg-green-600 text-white font-black py-4 px-8 rounded-xl hover:bg-green-700 shadow-md transform active:scale-95 text-lg w-full sm:w-auto">
-                                                    CONFIRMAR PRESENÇA E APROVAR (+50 pts)
-                                                </button>
-                                            </div>
-                                        )
-                                     })}
+                                            )
+                                        })
+                                    })()}
                                 </div>
                             )}
 
@@ -785,12 +831,12 @@
                                                             <td className="p-4 font-bold text-gray-700">{book.title}</td>
                                                             <td className="p-4 font-black">
                                                                 <span className={`px-4 py-1 rounded-full text-xs uppercase border ${
-                                                                    book.status === 'Lendo' ? 'bg-gray-100 text-gray-600 border-gray-300' :
+                                                                    book.status === 'Lendo' || book.status === 'pending' ? 'bg-gray-100 text-gray-600 border-gray-300' :
                                                                     book.status === 'Lido' ? 'bg-blue-100 text-blue-700 border-blue-300' :
                                                                     book.status === 'Agendado' ? 'bg-orange-100 text-orange-700 border-orange-300' :
-                                                                    book.status === 'Resumo Aprovado' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-gray-100'
+                                                                    book.status === 'Resumo Aprovado' || book.status === 'approved' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-gray-100'
                                                                 }`}>
-                                                                    {book.status}
+                                                                    {tStatus(book.status)}
                                                                 </span>
                                                             </td>
                                                         </tr>
