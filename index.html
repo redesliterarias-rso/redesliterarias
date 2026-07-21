@@ -5,15 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Desafio Redes Literárias - Biblioteca Délio Ledoux</title>
     
+    <!-- Servidores ultra-estáveis para nunca mais dar tela branca por falha de carregamento -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/17.0.2/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/17.0.2/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.22.20/babel.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-    <!-- Firebase Compat SDK -->
+    <!-- Firebase Compat SDK (Mais compatível com celulares antigos) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
@@ -25,13 +26,32 @@
         .text-brand-yellow { color: #f8b417; }
         .hide-scroll::-webkit-scrollbar { display: none; }
     </style>
+
+    <!-- Escudo Anti-Tela Branca Global -->
+    <script>
+        window.addEventListener('error', function(event) {
+            var root = document.getElementById('root');
+            if(root) {
+                root.innerHTML = `
+                <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #f8d7da; color: #721c24; padding: 20px; text-align: center; font-family: sans-serif;">
+                    <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">Ops! Falha de Conexão.</h1>
+                    <p style="font-size: 16px; margin-bottom: 20px;">O seu navegador ou internet bloqueou um arquivo importante.</p>
+                    <div style="background: white; padding: 10px; border-radius: 8px; color: #333; font-size: 12px; max-width: 100%; word-break: break-all; border: 1px solid #f5c6cb; margin-bottom: 20px;">
+                        <strong>Detalhe Técnico:</strong> ` + event.message + `
+                    </div>
+                    <button onclick="window.location.reload()" style="padding: 15px 30px; background-color: #dc3545; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Recarregar Sistema</button>
+                </div>`;
+            }
+        });
+    </script>
 </head>
 <body>
     <div id="root"></div>
 
-    <script type="text/babel">
+    <script type="text/babel" data-presets="react">
         const { useState, useEffect, useRef } = React;
 
+        // Chaves Oficiais do Banco de Dados Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyBjGF-lwJt1Lk7zlEZou42zQRiUOfPlh24",
             authDomain: "redes-literarias-rso.firebaseapp.com",
@@ -47,7 +67,7 @@
 
         try {
             if (typeof firebase === 'undefined') {
-                throw new Error("O servidor do Google Firebase foi bloqueado pelo seu navegador ou internet.");
+                throw new Error("Servidor do Google Firebase bloqueado.");
             }
             if (!firebase.apps.length) {
                 firebase.initializeApp(firebaseConfig);
@@ -58,24 +78,26 @@
             firebaseInitError = error.message;
         }
 
+        // Tradutor Universal de Status (compatibiliza dados velhos e novos)
         const tStatus = (s) => {
             if(!s) return 'Pendente';
             const map = {
-                'pending': 'Pendente',
+                'pending': 'Agendado',
                 'approved': 'Aprovado',
                 'active': 'Lendo na Biblioteca',
                 'blocked': 'Bloqueado',
                 'lendo': 'Lendo',
                 'lido': 'Lido',
                 'agendado': 'Agendado',
-                'resumo aprovado': 'Resumo Aprovado'
+                'resumo aprovado': 'Resumo Aprovado',
+                'em andamento': 'Lendo na Biblioteca'
             };
             return map[s.toLowerCase()] || s;
         };
 
         const tType = (t) => {
             if(!t) return '';
-            const map = { 'book': 'Livro', 'summary': 'Resumo', 'event': 'Evento', 'checkin': 'Presença' };
+            const map = { 'book': 'Livro', 'summary': 'Resumo', 'event': 'Evento', 'checkin': 'Presença', 'infraction': 'Punição' };
             return map[t.toLowerCase()] || t;
         };
 
@@ -86,7 +108,7 @@
             }
             static getDerivedStateFromError(error) { return { hasError: true }; }
             componentDidCatch(error, errorInfo) {
-                console.error("Erro capturado para evitar tela branca:", error, errorInfo);
+                console.error("Erro capturado:", error, errorInfo);
                 this.setState({ errorInfo: error.toString() });
             }
             render() {
@@ -94,8 +116,8 @@
                     return (
                         <div className="min-h-screen flex flex-col items-center justify-center bg-red-50 p-6 text-center">
                             <i className="fas fa-exclamation-triangle text-red-500 text-6xl mb-4"></i>
-                            <h1 className="text-2xl font-black text-red-800 mb-2">Pequeno erro de exibição contornado!</h1>
-                            <p className="text-red-600 font-medium mb-6">Seus dados estão seguros. Apenas ocorreu um conflito visual no seu celular.</p>
+                            <h1 className="text-2xl font-black text-red-800 mb-2">Pequeno erro contornado!</h1>
+                            <p className="text-red-600 font-medium mb-6">Seus dados estão 100% seguros. Apenas ocorreu um conflito visual.</p>
                             <div className="bg-white p-4 rounded-xl border border-red-200 text-left text-sm text-gray-700 w-full max-w-lg overflow-auto mb-6">
                                 {this.state.errorInfo}
                             </div>
@@ -126,7 +148,7 @@
                     const usersData = snapshot.docs.map(doc => ({ dbId: doc.id, ...doc.data() }));
                     setUsers(usersData);
                 }, err => {
-                    console.error("Erro ao ler users:", err);
+                    console.error("Erro users:", err);
                     setDbError(true);
                     setLoading(false);
                 });
@@ -136,7 +158,7 @@
                     setActivities(actData);
                     setLoading(false);
                 }, err => {
-                    console.error("Erro ao ler activities:", err);
+                    console.error("Erro activities:", err);
                     setDbError(true);
                     setLoading(false);
                 });
@@ -148,14 +170,37 @@
             }, []);
 
             if (dbError) return (
-                <div className="h-screen flex flex-col items-center justify-center bg-red-50 p-6 text-center">
+                <div className="min-h-screen flex flex-col items-center justify-center bg-red-50 p-6 text-center font-sans">
                     <i className="fas fa-database text-red-500 text-6xl mb-4"></i>
                     <h1 className="text-2xl font-black text-red-800 mb-2">Conexão Bloqueada</h1>
-                    <p className="text-red-600 font-medium mb-6 max-w-md">As regras do banco expiraram ou sua internet bloqueou o Google Firebase. Acesse o Console do Firebase &gt; Firestore Database &gt; Regras, adicione <code>allow read, write: if true;</code> e publique.</p>
+                    <p className="text-red-700 font-bold mb-4">As Regras de Segurança do Firebase expiraram após 30 dias.</p>
+                    <div className="bg-white p-6 rounded-xl border-2 border-red-200 text-left w-full max-w-lg shadow-lg">
+                        <p className="font-black text-gray-800 mb-3 text-lg">Para resolver agora e não perder nenhum dado:</p>
+                        <ol className="list-decimal pl-5 space-y-2 text-gray-700 font-medium">
+                            <li>Acesse o <a href="https://console.firebase.google.com" target="_blank" className="text-blue-600 underline">Console do Firebase</a></li>
+                            <li>Clique no seu projeto <strong>redes-literarias-rso</strong></li>
+                            <li>No menu esquerdo, clique em <strong>Firestore Database</strong></li>
+                            <li>Clique na aba <strong>Regras (Rules)</strong> na parte superior</li>
+                            <li>Apague o que está lá e cole este código exato:
+                                <div className="bg-gray-100 p-3 rounded-lg text-sm font-mono mt-2 mb-2 border border-gray-300">
+                                    rules_version = '2';<br/>
+                                    service cloud.firestore &#123;<br/>
+                                    &nbsp;&nbsp;match /databases/&#123;database&#125;/documents &#123;<br/>
+                                    &nbsp;&nbsp;&nbsp;&nbsp;match /&#123;document=**&#125; &#123;<br/>
+                                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;allow read, write: if true;<br/>
+                                    &nbsp;&nbsp;&nbsp;&nbsp;&#125;<br/>
+                                    &nbsp;&nbsp;&#125;<br/>
+                                    &#125;
+                                </div>
+                            </li>
+                            <li>Clique no botão azul <strong>Publicar (Publish)</strong></li>
+                        </ol>
+                        <button onClick={() => window.location.reload()} className="w-full mt-6 bg-red-600 text-white font-black py-4 rounded-xl hover:bg-red-700 shadow-md">Já publiquei! Recarregar Sistema.</button>
+                    </div>
                 </div>
             );
 
-            if (loading) return <div className="h-screen flex flex-col items-center justify-center bg-brand-blue text-white font-bold text-xl"><i className="fas fa-spinner fa-spin text-4xl mb-4 text-brand-yellow"></i> Conectando à nuvem de forma segura...</div>;
+            if (loading) return <div className="min-h-screen flex flex-col items-center justify-center bg-brand-blue text-white font-bold text-xl"><i className="fas fa-spinner fa-spin text-4xl mb-4 text-brand-yellow"></i> Conectando à nuvem de forma segura...</div>;
 
             if (view === 'login') return <LoginScreen setView={setView} users={users} setCurrentUser={setCurrentUser} />;
             if (view === 'register') return <RegisterScreen setView={setView} db={db} />;
@@ -172,8 +217,8 @@
             const [password, setPassword] = useState('');
             const [msg, setMsg] = useState('');
             
-            // Usando Data super segura para não quebrar no iPhone antigo
-            const deadline = new Date(2026, 6, 31, 23, 59, 59); // 31 de Julho de 2026
+            // PRAZO OFICIAL DAS INSCRIÇÕES: 31 DE JULHO DE 2026
+            const deadline = new Date(2026, 6, 31, 23, 59, 59); // Mês 6 = Julho
             const now = new Date();
             const isOpen = now.getTime() <= deadline.getTime();
 
@@ -203,22 +248,23 @@
 
             return (
                 <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-brand-yellow">
-                    <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
-                        <div className="p-8 bg-brand-blue text-white text-center rounded-b-[40px]">
-                            <div className="w-24 h-24 mx-auto bg-white rounded-full flex items-center justify-center mb-4 p-2 shadow-lg">
+                    <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-200">
+                        <div className="p-8 bg-brand-blue text-white text-center rounded-b-[40px] shadow-sm">
+                            <div className="w-24 h-24 mx-auto bg-white rounded-full flex items-center justify-center mb-4 p-2 shadow-lg border-4 border-brand-yellow">
                                 <i className="fas fa-book-reader text-brand-blue text-4xl"></i>
                             </div>
                             <h1 className="text-2xl font-black">Desafio Redes Literárias</h1>
-                            <p className="text-sm mt-1 text-gray-300">Biblioteca Délio Ledoux</p>
+                            <p className="text-sm mt-1 text-gray-300 font-bold">Biblioteca Délio Ledoux</p>
                         </div>
                         
-                        <div className="flex border-b">
-                            <button className={`flex-1 py-4 font-bold text-sm ${mode === 'user' ? 'text-brand-blue border-b-4 border-brand-blue' : 'text-gray-400'}`} onClick={() => { setMode('user'); setMsg(''); }}>SOU LEITOR</button>
-                            <button className={`flex-1 py-4 font-bold text-sm ${mode === 'admin' ? 'text-brand-blue border-b-4 border-brand-blue' : 'text-gray-400'}`} onClick={() => { setMode('admin'); setMsg(''); }}>ADMINISTRAÇÃO</button>
+                        <div className="flex border-b border-gray-200 bg-gray-50">
+                            <button className={`flex-1 py-4 font-black text-sm transition ${mode === 'user' ? 'text-brand-blue border-b-4 border-brand-blue bg-white' : 'text-gray-400'}`} onClick={() => { setMode('user'); setMsg(''); }}>SOU LEITOR</button>
+                            <button className={`flex-1 py-4 font-black text-sm transition ${mode === 'admin' ? 'text-brand-blue border-b-4 border-brand-blue bg-white' : 'text-gray-400'}`} onClick={() => { setMode('admin'); setMsg(''); }}>ADMINISTRADOR</button>
                         </div>
 
                         <div className="p-8">
-                            {msg && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-xl text-sm font-bold text-center shadow-inner"><i className="fas fa-exclamation-triangle mr-2"></i> {msg}</div>}
+                            {msg && <div className="mb-6 p-4 bg-red-100 text-red-700 rounded-xl text-sm font-bold text-center border border-red-200 shadow-sm"><i className="fas fa-exclamation-triangle mr-2"></i> {msg}</div>}
+                            
                             <form onSubmit={handleLogin} className="space-y-4">
                                 {mode === 'user' ? (
                                     <div>
@@ -237,17 +283,17 @@
                                         </div>
                                     </>
                                 )}
-                                <button type="submit" className="w-full bg-brand-blue text-white font-black py-4 rounded-xl hover:bg-opacity-90 shadow-lg transform active:scale-95 transition">
-                                    ENTRAR NO PAINEL
+                                <button type="submit" className="w-full bg-brand-blue text-white font-black py-4 rounded-xl hover:bg-opacity-90 shadow-lg transform active:scale-95 transition text-lg mt-2">
+                                    ENTRAR NO SISTEMA
                                 </button>
                             </form>
 
                             {mode === 'user' && (
-                                <div className="mt-6 text-center border-t pt-6">
+                                <div className="mt-8 text-center border-t border-gray-200 pt-6">
                                     {isOpen ? (
                                         <>
                                             <p className="text-sm font-bold text-gray-500 mb-3">Ainda não participa do desafio?</p>
-                                            <button onClick={() => setView('register')} className="w-full bg-brand-yellow text-brand-blue font-black py-4 rounded-xl hover:bg-yellow-500 shadow-md transform active:scale-95 transition">
+                                            <button onClick={() => setView('register')} className="w-full bg-brand-yellow text-brand-blue font-black py-4 rounded-xl hover:bg-yellow-500 shadow-md transform active:scale-95 transition text-lg">
                                                 FAZER INSCRIÇÃO AGORA
                                             </button>
                                         </>
@@ -269,7 +315,7 @@
             const [foto, setFoto] = useState(null);
             const [msg, setMsg] = useState('');
             const [loading, setLoading] = useState(false);
-            const [successData, setSuccessData] = useState(null); // Substitui o Alert() problemático
+            const [successData, setSuccessData] = useState(null);
             
             const deadline = new Date(2026, 6, 31, 23, 59, 59);
             const now = new Date();
@@ -277,38 +323,81 @@
             if (now.getTime() > deadline.getTime()) {
                 return (
                     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-                        <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md text-center">
+                        <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md text-center border-t-8 border-red-500">
                             <i className="fas fa-clock text-6xl text-red-500 mb-4"></i>
-                            <h2 className="text-2xl font-black text-gray-800 mb-2">Tempo Esgotado</h2>
-                            <p className="text-gray-600 mb-6 font-medium">As inscrições para o desafio já foram encerradas.</p>
-                            <button onClick={() => setView('login')} className="w-full bg-brand-blue text-white font-black py-4 rounded-xl hover:bg-opacity-90">Voltar ao Início</button>
+                            <h2 className="text-2xl font-black text-gray-800 mb-2">Inscrições Encerradas</h2>
+                            <button onClick={() => setView('login')} className="w-full bg-brand-blue text-white font-black py-4 rounded-xl hover:bg-opacity-90 mt-6">Voltar ao Início</button>
                         </div>
                     </div>
                 );
             }
 
+            // O Compressor Mágico de Imagens - Impede que o Firestore trave com fotos pesadas
             const handleImage = (e) => {
                 const file = e.target.files[0];
                 if (file) {
+                    if (!file.type.startsWith('image/')) {
+                        setMsg('Por favor, envie apenas arquivos de imagem.');
+                        return;
+                    }
                     const reader = new FileReader();
-                    reader.onloadend = () => setFoto(reader.result);
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const MAX_WIDTH = 500; 
+                            const MAX_HEIGHT = 500;
+                            let width = img.width;
+                            let height = img.height;
+                            
+                            // Redimensiona proporcionalmente
+                            if (width > height) {
+                                if (width > MAX_WIDTH) {
+                                    height = Math.round(height *= MAX_WIDTH / width);
+                                    width = MAX_WIDTH;
+                                }
+                            } else {
+                                if (height > MAX_HEIGHT) {
+                                    width = Math.round(width *= MAX_HEIGHT / height);
+                                    height = MAX_HEIGHT;
+                                }
+                            }
+                            
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+                            
+                            // Transforma numa imagem ultra leve em JPEG (70% de qualidade)
+                            const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                            setFoto(dataUrl);
+                        };
+                        img.onerror = () => setMsg('Erro ao ler a imagem da câmera.');
+                        img.src = event.target.result;
+                    };
                     reader.readAsDataURL(file);
                 }
             };
 
-            const handleSubmit = async (e) => {
+            const handleSubmit = (e) => {
                 e.preventDefault();
                 setMsg('');
                 
+                // Cálculo de idade perfeito (considera dia e mês)
                 const parts = form.nascimento.split('-');
                 if(parts.length !== 3) {
                     setMsg('Formato de data inválido.'); return;
                 }
                 const nasc = new Date(parts[0], parts[1]-1, parts[2]);
-                const age = new Date().getFullYear() - nasc.getFullYear();
+                const today = new Date();
+                let age = today.getFullYear() - nasc.getFullYear();
+                const m = today.getMonth() - nasc.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < nasc.getDate())) {
+                    age--;
+                }
                 
                 if (age < 11) {
-                    setMsg('É necessário ter 11 anos ou mais para participar.');
+                    setMsg('É necessário ter 11 anos completos para participar.');
                     return;
                 }
                 if (age < 18 && (!form.respNome || !form.respDoc || !form.respTel)) {
@@ -324,22 +413,20 @@
                 const num = Math.floor(100000 + Math.random() * 900000);
                 const registro = `RSO-${num}`;
 
-                try {
-                    await db.collection("users").add({
-                        ...form,
-                        foto,
-                        idade: age,
-                        registro,
-                        status: 'active',
-                        createdAt: new Date().toISOString()
-                    });
-                    
-                    // Mostramos sucesso via Modal customizado, NUNCA via window.alert()
+                db.collection("users").add({
+                    ...form,
+                    foto,
+                    idade: age,
+                    registro,
+                    status: 'active',
+                    createdAt: new Date().toISOString()
+                }).then(() => {
                     setSuccessData(registro);
-                } catch (err) {
-                    setMsg('Erro de conexão ao salvar. Verifique sua internet.');
+                }).catch(err => {
+                    console.error(err);
+                    setMsg('Erro de conexão ao salvar. A foto pode estar muito pesada ou a internet caiu.');
                     setLoading(false);
-                }
+                });
             };
 
             if (successData) {
@@ -349,11 +436,11 @@
                             <i className="fas fa-check-circle text-6xl text-green-500 mb-4"></i>
                             <h2 className="text-2xl font-black text-gray-800 mb-4">Inscrição de Sucesso!</h2>
                             <p className="text-gray-600 font-medium mb-4">Anote agora mesmo o seu número de registro oficial:</p>
-                            <div className="bg-green-50 border border-green-200 text-green-800 text-3xl font-black py-4 rounded-xl mb-6">
+                            <div className="bg-green-50 border border-green-200 text-green-800 text-3xl font-black py-4 rounded-xl mb-6 shadow-inner">
                                 {successData}
                             </div>
-                            <p className="text-sm text-gray-500 mb-6">Você usará este número para fazer login e baixar sua carteirinha.</p>
-                            <button onClick={() => setView('login')} className="w-full bg-brand-blue text-white font-black py-4 rounded-xl hover:bg-opacity-90 shadow-lg">
+                            <p className="text-sm text-gray-500 mb-6 font-bold">Você usará este número para fazer login e baixar sua carteirinha.</p>
+                            <button onClick={() => setView('login')} className="w-full bg-brand-blue text-white font-black py-4 rounded-xl hover:bg-opacity-90 shadow-lg text-lg">
                                 ACESSAR MEU PAINEL AGORA
                             </button>
                         </div>
@@ -364,10 +451,10 @@
             return (
                 <div className="min-h-screen bg-gray-100 p-4 py-8">
                     <div className="max-w-2xl mx-auto bg-white rounded-3xl shadow-xl p-8 border-t-8 border-brand-yellow">
-                        <button onClick={() => setView('login')} className="text-gray-500 font-bold mb-6 hover:text-brand-blue"><i className="fas fa-arrow-left mr-2"></i> Voltar ao Início</button>
+                        <button onClick={() => setView('login')} className="text-gray-500 font-black mb-6 hover:text-brand-blue"><i className="fas fa-arrow-left mr-2"></i> Voltar ao Início</button>
                         <h2 className="text-3xl font-black text-brand-blue mb-8">Inscrição no Desafio</h2>
                         
-                        {msg && <div className="mb-6 p-4 bg-red-100 text-red-700 rounded-xl font-bold border-l-4 border-red-500">{msg}</div>}
+                        {msg && <div className="mb-6 p-4 bg-red-100 text-red-700 rounded-xl font-bold border-l-4 border-red-500 shadow-sm">{msg}</div>}
                         
                         <form onSubmit={handleSubmit} className="space-y-6">
                             <div className="bg-gray-50 p-6 rounded-2xl border-2 border-dashed border-gray-300 text-center">
@@ -378,11 +465,11 @@
                                 )}
                                 
                                 <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">
-                                    <label className="bg-brand-blue text-white font-bold py-3 px-6 rounded-xl cursor-pointer hover:bg-opacity-90 shadow-md">
+                                    <label className="bg-brand-blue text-white font-black py-3 px-6 rounded-xl cursor-pointer hover:bg-opacity-90 shadow-md">
                                         <i className="fas fa-camera mr-2"></i> Tirar Foto 
                                         <input type="file" accept="image/*" capture="user" onChange={handleImage} className="hidden" />
                                     </label>
-                                    <label className="bg-gray-200 text-gray-700 font-bold py-3 px-6 rounded-xl cursor-pointer hover:bg-gray-300 shadow-md">
+                                    <label className="bg-gray-200 text-gray-700 font-black py-3 px-6 rounded-xl cursor-pointer hover:bg-gray-300 shadow-md">
                                         <i className="fas fa-upload mr-2"></i> Enviar Arquivo
                                         <input type="file" accept="image/*" onChange={handleImage} className="hidden" />
                                     </label>
@@ -413,25 +500,25 @@
                                 </div>
                             </div>
 
-                            <div className="bg-yellow-50 p-6 rounded-2xl border-2 border-yellow-200">
-                                <h3 className="font-bold text-yellow-800 mb-4 text-lg"><i className="fas fa-exclamation-circle mr-2"></i>Para Menores de 18 Anos (Obrigatório)</h3>
+                            <div className="bg-yellow-50 p-6 rounded-2xl border-2 border-yellow-200 shadow-sm">
+                                <h3 className="font-black text-yellow-800 mb-4 text-lg"><i className="fas fa-exclamation-circle mr-2"></i>Para Menores de 18 Anos (Obrigatório)</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
                                         <label className="block text-sm font-bold text-yellow-800 mb-2">Nome do Responsável</label>
-                                        <input type="text" value={form.respNome} onChange={e => setForm({...form, respNome: e.target.value})} className="w-full p-4 bg-white border-2 rounded-xl outline-none font-bold" />
+                                        <input type="text" value={form.respNome} onChange={e => setForm({...form, respNome: e.target.value})} className="w-full p-4 bg-white border-2 border-yellow-100 rounded-xl outline-none font-bold focus:border-yellow-400" />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-yellow-800 mb-2">CPF do Responsável</label>
-                                        <input type="text" value={form.respDoc} onChange={e => setForm({...form, respDoc: e.target.value})} className="w-full p-4 bg-white border-2 rounded-xl outline-none font-bold" />
+                                        <input type="text" value={form.respDoc} onChange={e => setForm({...form, respDoc: e.target.value})} className="w-full p-4 bg-white border-2 border-yellow-100 rounded-xl outline-none font-bold focus:border-yellow-400" />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-yellow-800 mb-2">Telefone do Responsável</label>
-                                        <input type="text" value={form.respTel} onChange={e => setForm({...form, respTel: e.target.value})} className="w-full p-4 bg-white border-2 rounded-xl outline-none font-bold" />
+                                        <input type="text" value={form.respTel} onChange={e => setForm({...form, respTel: e.target.value})} className="w-full p-4 bg-white border-2 border-yellow-100 rounded-xl outline-none font-bold focus:border-yellow-400" />
                                     </div>
                                 </div>
                             </div>
 
-                            <button type="submit" disabled={loading} className="w-full bg-brand-yellow text-brand-blue font-black text-lg py-5 rounded-xl shadow-lg hover:bg-yellow-500 transition disabled:opacity-50">
+                            <button type="submit" disabled={loading} className="w-full bg-brand-yellow text-brand-blue font-black text-xl py-5 rounded-xl shadow-lg hover:bg-yellow-500 transition disabled:opacity-50">
                                 {loading ? 'SALVANDO DADOS...' : 'CONCLUIR INSCRIÇÃO'}
                             </button>
                         </form>
@@ -450,8 +537,9 @@
 
             const userActs = activities.filter(a => a.userId === user.dbId);
             const myBooks = userActs.filter(a => a.type === 'book');
-            const activeCheckin = userActs.find(a => a.type === 'checkin' && (a.status === 'active' || a.status === 'Em Andamento'));
+            const activeCheckin = userActs.find(a => a.type === 'checkin' && (a.status === 'active' || a.status === 'Em Andamento' || a.status === 'Lendo na Biblioteca'));
             
+            // Soma pontos garantindo compatibilidade com registros antigos e novos
             const totalPoints = userActs.reduce((sum, act) => {
                 if (act.status === 'approved' || act.status === 'Resumo Aprovado') {
                     return sum + (Number(act.points) || 0);
@@ -487,41 +575,46 @@
                 return pts;
             };
 
-            const toggleCheckin = async () => {
+            const toggleCheckin = () => {
                 setCheckinLoading(true);
-                try {
-                    if (activeCheckin) {
-                        const start = new Date(activeCheckin.startTime);
-                        const end = new Date();
-                        const diffMins = Math.floor((end - start) / 60000);
-                        const earnedPts = calculatePoints(diffMins);
-                        
-                        await db.collection("activities").doc(activeCheckin.dbId).update({
-                            status: 'approved',
-                            endTime: end.toISOString(),
-                            minutes: diffMins,
-                            points: earnedPts
-                        });
+                if (activeCheckin) {
+                    const start = new Date(activeCheckin.startTime);
+                    const end = new Date();
+                    const diffMins = Math.floor((end - start) / 60000);
+                    const earnedPts = calculatePoints(diffMins);
+                    
+                    db.collection("activities").doc(activeCheckin.dbId).update({
+                        status: 'approved',
+                        endTime: end.toISOString(),
+                        minutes: diffMins,
+                        points: earnedPts
+                    }).then(() => {
                         showMsg(`Check-out feito! Você ficou ${diffMins} min e ganhou ${earnedPts} pontos.`);
-                    } else {
-                        await db.collection("activities").add({
-                            userId: user.dbId,
-                            type: 'checkin',
-                            status: 'active',
-                            startTime: new Date().toISOString(),
-                            title: 'Leitura Presencial na Biblioteca'
-                        });
+                        setCheckinLoading(false);
+                    }).catch(e => {
+                        showMsg('Erro de conexão.', 'error');
+                        setCheckinLoading(false);
+                    });
+                } else {
+                    db.collection("activities").add({
+                        userId: user.dbId,
+                        type: 'checkin',
+                        status: 'Lendo na Biblioteca',
+                        startTime: new Date().toISOString(),
+                        title: 'Leitura Presencial na Biblioteca'
+                    }).then(() => {
                         showMsg('Check-in realizado! Aproveite sua leitura. Não esqueça de fazer check-out ao sair.');
-                    }
-                } catch (e) {
-                    showMsg('Erro de conexão.', 'error');
+                        setCheckinLoading(false);
+                    }).catch(e => {
+                        showMsg('Erro de conexão.', 'error');
+                        setCheckinLoading(false);
+                    });
                 }
-                setCheckinLoading(false);
             };
 
-            const handleRegisterBook = async (e) => {
+            const handleRegisterBook = (e) => {
                 e.preventDefault();
-                await db.collection("activities").add({
+                db.collection("activities").add({
                     userId: user.dbId,
                     type: 'book',
                     status: 'Lendo',
@@ -531,32 +624,35 @@
                     stars: bookForm.avaliacao,
                     date: new Date().toISOString(),
                     points: 10
+                }).then(() => {
+                    showMsg(`Parabéns! O livro "${bookForm.titulo}" foi adicionado. (+10 pts)`);
+                    setBookForm({ titulo: '', autor: '', ano: '', avaliacao: 5 });
+                    setTab('livros');
                 });
-                showMsg(`Parabéns! O livro "${bookForm.titulo}" foi adicionado. (+10 pts)`);
-                setBookForm({ titulo: '', autor: '', ano: '', avaliacao: 5 });
-                setTab('livros');
             };
 
-            const handleUpdateBookStatus = async (bookId, newStatus) => {
-                await db.collection("activities").doc(bookId).update({ status: newStatus });
-                showMsg('Status do livro atualizado para LIDO! Já pode agendar seu resumo.');
+            const handleUpdateBookStatus = (bookId, newStatus) => {
+                db.collection("activities").doc(bookId).update({ status: newStatus }).then(() => {
+                    showMsg('Status do livro atualizado para LIDO! Já pode agendar seu resumo.');
+                });
             };
 
-            const handleScheduleSummary = async (e) => {
+            const handleScheduleSummary = (e) => {
                 e.preventDefault();
                 if(!scheduleData.bookId || !scheduleData.date || !scheduleData.time) {
-                    showMsg("Preencha todos os campos do formulário de agendamento.", "error");
+                    showMsg("Preencha todos os campos (Data e Hora) para agendar.", "error");
                     return;
                 }
 
-                await db.collection("activities").doc(scheduleData.bookId).update({
+                db.collection("activities").doc(scheduleData.bookId).update({
                     status: 'Agendado',
                     scheduleDate: scheduleData.date,
                     scheduleTime: scheduleData.time
+                }).then(() => {
+                    showMsg("Pedido de Agendamento enviado! Compareça no dia e hora marcados.");
+                    setScheduleData({ bookId: '', date: '', time: '' });
+                    setTab('home');
                 });
-                showMsg("Pedido de Agendamento enviado! Compareça no dia e hora marcados na biblioteca.");
-                setScheduleData({ bookId: '', date: '', time: '' });
-                setTab('home');
             };
 
             return (
@@ -567,10 +663,10 @@
                                 <i className="fas fa-book-reader text-2xl text-brand-yellow"></i>
                                 <div>
                                     <h1 className="font-black text-lg">Redes Literárias</h1>
-                                    <p className="text-xs text-gray-300">Área do Leitor</p>
+                                    <p className="text-xs text-gray-300 font-bold">Área do Leitor</p>
                                 </div>
                             </div>
-                            <button onClick={() => setView('login')} className="text-sm font-bold text-red-300 hover:text-red-100"><i className="fas fa-sign-out-alt mr-1"></i> Sair</button>
+                            <button onClick={() => setView('login')} className="text-sm font-black text-red-300 hover:text-red-100"><i className="fas fa-sign-out-alt mr-1"></i> Sair</button>
                         </div>
                     </header>
 
@@ -580,40 +676,40 @@
                                 <div className="absolute top-0 w-full h-24 bg-brand-yellow rounded-b-[50px] opacity-20"></div>
                                 <img src={user.foto} crossOrigin="anonymous" className="w-24 h-24 rounded-full border-4 border-brand-yellow shadow-lg z-10 object-cover bg-white" />
                                 <h2 className="text-2xl font-black mt-4 z-10 text-center">{user.nome}</h2>
-                                <p className="text-brand-yellow font-bold z-10 mt-1 bg-black bg-opacity-30 px-4 py-1 rounded-full"><i className="fas fa-id-badge mr-1"></i> {user.registro}</p>
-                                <div className="w-full flex justify-between mt-6 bg-black bg-opacity-20 p-4 rounded-xl z-10 backdrop-blur-sm border border-gray-600">
-                                    <div className="text-center"><p className="text-xs text-gray-300 uppercase font-bold">Pontuação</p><p className="text-2xl font-black text-brand-yellow">{totalPoints} pts</p></div>
+                                <p className="text-brand-yellow font-black z-10 mt-1 bg-black bg-opacity-30 px-4 py-1 rounded-full border border-gray-600"><i className="fas fa-id-badge mr-1"></i> {user.registro}</p>
+                                <div className="w-full flex justify-between mt-6 bg-black bg-opacity-30 p-4 rounded-xl z-10 backdrop-blur-sm border border-gray-600 shadow-inner">
+                                    <div className="text-center"><p className="text-xs text-gray-300 uppercase font-bold">Pontuação Oficial</p><p className="text-2xl font-black text-brand-yellow">{totalPoints} pts</p></div>
                                     <div className="text-center"><p className="text-xs text-gray-300 uppercase font-bold">Livros Lidos</p><p className="text-2xl font-black text-brand-yellow">{myBooks.filter(b=>b.status === 'Lido' || b.status === 'Agendado' || b.status === 'Resumo Aprovado' || b.status === 'approved').length}</p></div>
                                 </div>
                             </div>
-                            <button onClick={handleDownloadCard} className="w-full py-4 text-brand-blue font-black hover:bg-gray-50 flex items-center justify-center transition border-t"><i className="fas fa-download mr-2 text-xl"></i> Baixar Carteirinha Oficial</button>
+                            <button onClick={handleDownloadCard} className="w-full py-5 text-brand-blue font-black hover:bg-gray-50 flex items-center justify-center transition border-t text-lg"><i className="fas fa-download mr-2 text-2xl"></i> Baixar Carteirinha Oficial</button>
                         </div>
 
-                        <div className="flex bg-white rounded-2xl shadow-sm p-2 overflow-x-auto hide-scroll gap-2 border">
-                            <button onClick={() => setTab('home')} className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold text-sm transition ${tab === 'home' ? 'bg-brand-blue text-white shadow-md' : 'bg-gray-50 text-gray-600'}`}><i className="fas fa-home block mb-1 text-lg"></i> Início</button>
-                            <button onClick={() => setTab('checkin')} className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold text-sm transition ${tab === 'checkin' ? 'bg-green-500 text-white shadow-md' : 'bg-gray-50 text-gray-600'}`}><i className="fas fa-map-marker-alt block mb-1 text-lg"></i> Check-in</button>
-                            <button onClick={() => setTab('livros')} className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold text-sm transition ${tab === 'livros' ? 'bg-brand-blue text-white shadow-md' : 'bg-gray-50 text-gray-600'}`}><i className="fas fa-book block mb-1 text-lg"></i> Leituras</button>
-                            <button onClick={() => setTab('agendar')} className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold text-sm transition ${tab === 'agendar' ? 'bg-orange-500 text-white shadow-md' : 'bg-gray-50 text-gray-600'}`}><i className="fas fa-calendar-check block mb-1 text-lg"></i> Agendar Resumo</button>
+                        <div className="flex bg-white rounded-2xl shadow-sm p-2 overflow-x-auto hide-scroll gap-2 border border-gray-200">
+                            <button onClick={() => setTab('home')} className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-black text-sm transition ${tab === 'home' ? 'bg-brand-blue text-white shadow-md' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-home block mb-1 text-xl"></i> Início</button>
+                            <button onClick={() => setTab('checkin')} className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-black text-sm transition ${tab === 'checkin' ? 'bg-green-500 text-white shadow-md' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-map-marker-alt block mb-1 text-xl"></i> Check-in</button>
+                            <button onClick={() => setTab('livros')} className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-black text-sm transition ${tab === 'livros' ? 'bg-brand-blue text-white shadow-md' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-book block mb-1 text-xl"></i> Leituras</button>
+                            <button onClick={() => setTab('agendar')} className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-black text-sm transition ${tab === 'agendar' ? 'bg-orange-500 text-white shadow-md' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}><i className="fas fa-calendar-check block mb-1 text-xl"></i> Agendar Resumo</button>
                         </div>
 
-                        {msg.text && <div className={`p-4 rounded-xl font-bold text-sm text-center shadow-sm ${msg.type === 'error' ? 'bg-red-100 text-red-800 border border-red-200' : 'bg-green-100 text-green-800 border border-green-200'}`}>{msg.text}</div>}
+                        {msg.text && <div className={`p-4 rounded-xl font-black text-sm text-center shadow-md border ${msg.type === 'error' ? 'bg-red-100 text-red-800 border-red-300' : 'bg-green-100 text-green-800 border-green-300'}`}>{msg.text}</div>}
 
                         {tab === 'home' && (
-                            <div className="bg-white rounded-3xl shadow-sm p-6 border">
+                            <div className="bg-white rounded-3xl shadow-sm p-6 border border-gray-200">
                                 <h3 className="font-black text-xl text-brand-blue border-b-2 pb-2 mb-4">Seu Histórico</h3>
                                 <div className="space-y-3">
-                                    {userActs.length === 0 ? <p className="text-gray-500 text-center py-6 font-bold">Nenhuma atividade registrada ainda.</p> : 
+                                    {userActs.length === 0 ? <p className="text-gray-500 text-center py-8 font-bold border-2 border-dashed rounded-xl bg-gray-50">Nenhuma atividade registrada ainda.</p> : 
                                      userActs.sort((a,b) => new Date(b.date || b.startTime) - new Date(a.date || a.startTime)).map(act => (
-                                        <div key={act.dbId} className="flex justify-between items-center p-4 border rounded-xl bg-gray-50 hover:bg-gray-100 transition">
+                                        <div key={act.dbId} className="flex justify-between items-center p-4 border-2 rounded-xl bg-gray-50 hover:bg-gray-100 transition shadow-sm">
                                             <div>
-                                                <p className="font-bold text-gray-800">{act.title}</p>
+                                                <p className="font-black text-gray-800 text-lg">{act.title}</p>
                                                 <p className="text-xs font-bold text-gray-500 uppercase mt-1">
                                                     {act.type === 'book' ? `Status: ${tStatus(act.status)}` : 
                                                      act.type === 'checkin' ? `Presença (${act.minutes || 0} min)` : 
                                                      tType(act.type)}
                                                 </p>
                                             </div>
-                                            <div className={`font-black text-sm px-4 py-2 rounded-xl shadow-sm ${(act.status === 'approved' || act.status === 'Resumo Aprovado') ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-white border text-gray-600'}`}>
+                                            <div className={`font-black text-sm px-4 py-2 rounded-xl shadow-sm border ${(act.status === 'approved' || act.status === 'Resumo Aprovado') ? 'bg-green-100 text-green-700 border-green-300' : 'bg-white text-gray-600 border-gray-300'}`}>
                                                 {act.points > 0 ? `+${act.points} pts` : tStatus(act.status)}
                                             </div>
                                         </div>
@@ -623,24 +719,24 @@
                         )}
 
                         {tab === 'checkin' && (
-                            <div className="bg-white rounded-3xl shadow-sm p-6 text-center border-t-4 border-green-500">
+                            <div className="bg-white rounded-3xl shadow-sm p-6 text-center border-t-8 border-green-500">
                                 <h3 className="font-black text-2xl text-gray-800 mb-2">Presença na Biblioteca</h3>
                                 <p className="text-sm text-gray-600 mb-6 font-bold">Pontue pelo tempo que passar lendo presencialmente!</p>
                                 
-                                <div className="bg-green-50 text-green-800 p-4 rounded-xl font-bold text-sm mb-8 flex flex-wrap justify-center gap-4 border border-green-200">
-                                    <div className="bg-white px-3 py-1 rounded shadow-sm">20m = 0.5pt</div>
-                                    <div className="bg-white px-3 py-1 rounded shadow-sm">30m = 1pt</div>
-                                    <div className="bg-white px-3 py-1 rounded shadow-sm">40m = 2pt</div>
-                                    <div className="bg-white px-3 py-1 rounded shadow-sm">1h = 3pt</div>
+                                <div className="bg-green-50 text-green-800 p-4 rounded-xl font-bold text-sm mb-8 flex flex-wrap justify-center gap-4 border-2 border-green-200 shadow-inner">
+                                    <div className="bg-white px-4 py-2 rounded-lg shadow-sm border border-green-100">20m = 0.5pt</div>
+                                    <div className="bg-white px-4 py-2 rounded-lg shadow-sm border border-green-100">30m = 1pt</div>
+                                    <div className="bg-white px-4 py-2 rounded-lg shadow-sm border border-green-100">40m = 2pt</div>
+                                    <div className="bg-white px-4 py-2 rounded-lg shadow-sm border border-green-100">1h = 3pt</div>
                                 </div>
 
                                 {activeCheckin ? (
-                                    <button onClick={toggleCheckin} disabled={checkinLoading} className="w-full max-w-sm mx-auto bg-red-500 text-white font-black text-xl py-16 rounded-[40px] shadow-2xl hover:bg-red-600 transition flex flex-col items-center justify-center border-8 border-red-200 transform active:scale-95">
-                                        <i className="fas fa-sign-out-alt text-5xl mb-4"></i> ENCERRAR LEITURA
+                                    <button onClick={toggleCheckin} disabled={checkinLoading} className="w-full max-w-sm mx-auto bg-red-500 text-white font-black text-2xl py-16 rounded-[40px] shadow-2xl hover:bg-red-600 transition flex flex-col items-center justify-center border-8 border-red-200 transform active:scale-95">
+                                        <i className="fas fa-sign-out-alt text-6xl mb-4"></i> ENCERRAR LEITURA
                                     </button>
                                 ) : (
-                                    <button onClick={toggleCheckin} disabled={checkinLoading} className="w-full max-w-sm mx-auto bg-green-500 text-white font-black text-xl py-16 rounded-[40px] shadow-2xl hover:bg-green-600 transition flex flex-col items-center justify-center border-8 border-green-200 transform active:scale-95">
-                                        <i className="fas fa-map-marker-alt text-5xl mb-4"></i> INICIAR LEITURA
+                                    <button onClick={toggleCheckin} disabled={checkinLoading} className="w-full max-w-sm mx-auto bg-green-500 text-white font-black text-2xl py-16 rounded-[40px] shadow-2xl hover:bg-green-600 transition flex flex-col items-center justify-center border-8 border-green-200 transform active:scale-95">
+                                        <i className="fas fa-map-marker-alt text-6xl mb-4"></i> INICIAR LEITURA
                                     </button>
                                 )}
                             </div>
@@ -648,17 +744,17 @@
 
                         {tab === 'livros' && (
                             <div className="space-y-6">
-                                <div className="bg-white rounded-3xl shadow-sm p-6 border-l-4 border-brand-yellow">
+                                <div className="bg-white rounded-3xl shadow-sm p-6 border-t-8 border-brand-yellow">
                                     <h3 className="font-black text-xl text-brand-blue mb-4">Cadastrar Novo Livro</h3>
                                     <form onSubmit={handleRegisterBook} className="space-y-4">
-                                        <input type="text" required value={bookForm.titulo} onChange={e=>setBookForm({...bookForm, titulo: e.target.value})} placeholder="Nome do Livro" className="w-full p-4 border-2 rounded-xl bg-gray-50 font-bold outline-none focus:border-brand-yellow" />
+                                        <input type="text" required value={bookForm.titulo} onChange={e=>setBookForm({...bookForm, titulo: e.target.value})} placeholder="Nome do Livro" className="w-full p-4 border-2 rounded-xl bg-gray-50 font-bold outline-none focus:border-brand-yellow text-lg" />
                                         <div className="grid grid-cols-2 gap-4">
                                             <input type="text" required value={bookForm.autor} onChange={e=>setBookForm({...bookForm, autor: e.target.value})} placeholder="Autor do Livro" className="w-full p-4 border-2 rounded-xl bg-gray-50 font-bold outline-none focus:border-brand-yellow" />
                                             <input type="number" required value={bookForm.ano} onChange={e=>setBookForm({...bookForm, ano: e.target.value})} placeholder="Ano de Lançamento" className="w-full p-4 border-2 rounded-xl bg-gray-50 font-bold outline-none focus:border-brand-yellow" />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-bold text-gray-700 mb-2">Avaliação do Livro (Estrelas)</label>
-                                            <select value={bookForm.avaliacao} onChange={e=>setBookForm({...bookForm, avaliacao: Number(e.target.value)})} className="w-full p-4 border-2 rounded-xl bg-gray-50 font-bold outline-none focus:border-brand-yellow">
+                                            <select value={bookForm.avaliacao} onChange={e=>setBookForm({...bookForm, avaliacao: Number(e.target.value)})} className="w-full p-4 border-2 rounded-xl bg-gray-50 font-bold outline-none focus:border-brand-yellow text-lg">
                                                 <option value="5">⭐⭐⭐⭐⭐ (Incrível!)</option>
                                                 <option value="4">⭐⭐⭐⭐ (Muito Bom)</option>
                                                 <option value="3">⭐⭐⭐ (Legalzinho)</option>
@@ -666,25 +762,25 @@
                                                 <option value="1">⭐ (Não Gostei)</option>
                                             </select>
                                         </div>
-                                        <button type="submit" className="w-full bg-brand-blue text-white font-black text-lg py-4 rounded-xl hover:bg-opacity-90 shadow-md">SALVAR LIVRO</button>
+                                        <button type="submit" className="w-full bg-brand-blue text-white font-black text-xl py-5 rounded-xl hover:bg-opacity-90 shadow-lg transform active:scale-95 transition mt-2">SALVAR LIVRO (+10 pts)</button>
                                     </form>
                                 </div>
 
-                                <div className="bg-white rounded-3xl shadow-sm p-6 border">
+                                <div className="bg-white rounded-3xl shadow-sm p-6 border border-gray-200">
                                     <h3 className="font-black text-xl text-brand-blue mb-4">Minha Estante</h3>
                                     <div className="space-y-4">
-                                        {myBooks.length === 0 ? <p className="text-gray-500 font-bold text-center py-4">Nenhum livro salvo ainda.</p> : 
+                                        {myBooks.length === 0 ? <p className="text-gray-500 font-bold text-center py-8 bg-gray-50 rounded-xl border-2 border-dashed">Nenhum livro salvo ainda.</p> : 
                                          myBooks.map(book => (
-                                            <div key={book.dbId} className="p-4 border-2 rounded-xl bg-gray-50 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                                            <div key={book.dbId} className="p-5 border-2 rounded-xl bg-gray-50 flex flex-col sm:flex-row justify-between sm:items-center gap-4 shadow-sm">
                                                 <div>
-                                                    <h4 className="font-black text-lg text-gray-800">{book.title}</h4>
-                                                    <p className="text-sm font-bold text-gray-500 mb-2">{book.author} | {book.year} | {'⭐'.repeat(book.stars || 5)}</p>
-                                                    <span className={`text-xs font-black px-3 py-1 rounded-lg uppercase border ${(book.status === 'Lido' || book.status === 'Agendado' || book.status === 'Resumo Aprovado' || book.status === 'approved') ? 'bg-green-100 text-green-700 border-green-300' : 'bg-yellow-100 text-yellow-700 border-yellow-300'}`}>
+                                                    <h4 className="font-black text-xl text-gray-800">{book.title}</h4>
+                                                    <p className="text-sm font-bold text-gray-500 mb-3">{book.author} | {book.year} | {book.stars ? '⭐'.repeat(book.stars) : '⭐⭐⭐⭐⭐'}</p>
+                                                    <span className={`text-xs font-black px-4 py-2 rounded-lg uppercase border shadow-sm ${(book.status === 'Lido' || book.status === 'Agendado' || book.status === 'Resumo Aprovado' || book.status === 'approved') ? 'bg-green-100 text-green-700 border-green-300' : 'bg-yellow-100 text-yellow-800 border-yellow-400'}`}>
                                                         {tStatus(book.status)}
                                                     </span>
                                                 </div>
                                                 {(book.status === 'Lendo' || book.status === 'pending') && (
-                                                    <button onClick={() => handleUpdateBookStatus(book.dbId, 'Lido')} className="bg-green-500 text-white font-black px-4 py-3 rounded-xl hover:bg-green-600 shadow-sm shrink-0"><i className="fas fa-check mr-2"></i>Terminei de Ler</button>
+                                                    <button onClick={() => handleUpdateBookStatus(book.dbId, 'Lido')} className="bg-green-500 text-white font-black px-6 py-4 rounded-xl hover:bg-green-600 shadow-md transform active:scale-95 shrink-0 text-lg"><i className="fas fa-check mr-2"></i>Terminei de Ler</button>
                                                 )}
                                             </div>
                                          ))}
@@ -697,23 +793,23 @@
                             <div className="bg-white rounded-3xl shadow-sm p-6 border-t-8 border-orange-500">
                                 <h3 className="font-black text-2xl text-gray-800 mb-4">Agendar Entrega de Resumo</h3>
                                 
-                                <div className="bg-orange-50 text-orange-800 p-5 rounded-2xl font-bold text-sm mb-6 shadow-sm border border-orange-200">
-                                    <h4 className="text-lg font-black mb-2"><i className="fas fa-exclamation-triangle mr-2"></i> REGRAS DO RESUMO</h4>
-                                    <p className="mb-2">O resumo é escrito <strong>presencialmente na Biblioteca Municipal, sem consulta.</strong> Só queremos saber o que você entendeu da história!</p>
-                                    <ul className="list-disc pl-5 space-y-1 mb-2 text-orange-900">
+                                <div className="bg-orange-50 text-orange-900 p-6 rounded-2xl font-bold text-sm mb-6 shadow-inner border-2 border-orange-200">
+                                    <h4 className="text-lg font-black mb-3"><i className="fas fa-exclamation-triangle mr-2"></i> REGRAS DO RESUMO</h4>
+                                    <p className="mb-3">O resumo é escrito <strong>presencialmente na Biblioteca Municipal, sem consulta.</strong> Só queremos saber o que você entendeu da história!</p>
+                                    <ul className="list-disc pl-5 space-y-2 mb-2 bg-white p-4 rounded-xl shadow-sm border border-orange-100">
                                         <li><strong>Dias:</strong> Terça a Quinta-feira</li>
                                         <li><strong>Horários:</strong> 09:00 às 17:30</li>
                                     </ul>
                                 </div>
 
                                 {myBooks.filter(b => b.status === 'Lido' || b.status === 'approved').length === 0 ? (
-                                    <div className="text-center font-bold text-gray-500 p-8 bg-gray-50 rounded-2xl border-2 border-dashed">
-                                        <i className="fas fa-book-open text-4xl mb-3 text-gray-300"></i>
-                                        <p>Você não tem livros marcados como "Lido" para agendar resumo.</p>
-                                        <button onClick={()=>setTab('livros')} className="mt-4 text-brand-blue underline">Ir para Minha Estante</button>
+                                    <div className="text-center font-bold text-gray-500 p-10 bg-gray-50 rounded-2xl border-2 border-dashed">
+                                        <i className="fas fa-book-open text-5xl mb-4 text-gray-300"></i>
+                                        <p className="text-lg">Você não tem livros marcados como "Lido" para agendar resumo.</p>
+                                        <button onClick={()=>setTab('livros')} className="mt-4 text-brand-blue underline text-lg">Ir para Minha Estante</button>
                                     </div>
                                 ) : (
-                                    <form onSubmit={handleScheduleSummary} className="space-y-4">
+                                    <form onSubmit={handleScheduleSummary} className="space-y-6">
                                         <div>
                                             <label className="block text-sm font-bold text-gray-700 mb-2">Qual livro você quer resumir?</label>
                                             <select required value={scheduleData.bookId} onChange={e=>setScheduleData({...scheduleData, bookId: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-gray-50 font-bold outline-none focus:border-orange-500 text-lg">
@@ -724,14 +820,14 @@
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <label className="block text-sm font-bold text-gray-700 mb-2">Data da Ida</label>
-                                                <input type="date" required value={scheduleData.date} onChange={e=>setScheduleData({...scheduleData, date: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-gray-50 font-bold outline-none focus:border-orange-500" />
+                                                <input type="date" required value={scheduleData.date} onChange={e=>setScheduleData({...scheduleData, date: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-gray-50 font-bold outline-none focus:border-orange-500 text-lg" />
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-bold text-gray-700 mb-2">Horário</label>
-                                                <input type="time" min="09:00" max="17:30" required value={scheduleData.time} onChange={e=>setScheduleData({...scheduleData, time: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-gray-50 font-bold outline-none focus:border-orange-500" />
+                                                <input type="time" min="09:00" max="17:30" required value={scheduleData.time} onChange={e=>setScheduleData({...scheduleData, time: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-gray-50 font-bold outline-none focus:border-orange-500 text-lg" />
                                             </div>
                                         </div>
-                                        <button type="submit" className="w-full bg-orange-500 text-white font-black py-5 rounded-xl hover:bg-orange-600 transition shadow-lg text-lg transform active:scale-95 mt-2">
+                                        <button type="submit" className="w-full bg-orange-500 text-white font-black py-5 rounded-xl hover:bg-orange-600 transition shadow-lg text-xl transform active:scale-95 mt-4">
                                             ENVIAR PEDIDO DE AGENDAMENTO
                                         </button>
                                     </form>
@@ -747,7 +843,7 @@
             const [tab, setTab] = useState('resumos');
             const [msg, setMsg] = useState({text:'', type:''});
             const [eventData, setEventData] = useState({ cpf: '', nomeEvento: '' });
-            const [deleteConfirm, setDeleteConfirm] = useState(null); // Substitui window.confirm
+            const [deleteConfirm, setDeleteConfirm] = useState(null);
 
             const showMsg = (text, type = 'success') => {
                 setMsg({ text, type });
@@ -761,33 +857,44 @@
                 return { ...u, points: pts - infractions };
             }).sort((a,b) => b.points - a.points);
 
-            const handleApproveSummary = async (act) => {
-                if (act.type === 'book') {
-                    await db.collection("activities").doc(act.dbId).update({ status: 'Resumo Aprovado', points: 50 });
-                } else {
-                    await db.collection("activities").doc(act.dbId).update({ status: 'approved' });
-                }
-                showMsg('Resumo Aprovado! 50 pontos adicionados ao leitor.');
+            const handleApproveSummary = (act) => {
+                const promise = act.type === 'book' 
+                    ? db.collection("activities").doc(act.dbId).update({ status: 'Resumo Aprovado', points: 50 })
+                    : db.collection("activities").doc(act.dbId).update({ status: 'approved' });
+                
+                promise.then(() => {
+                    showMsg('Resumo Aprovado! 50 pontos adicionados ao leitor.');
+                });
             };
 
-            const handleRegisterEvent = async (e) => {
+            const handleRegisterEvent = (e) => {
                 e.preventDefault();
                 const user = users.find(u => u.registro === eventData.cpf || u.documento === eventData.cpf);
                 if (!user) { showMsg('Leitor não encontrado.', 'error'); return; }
-                await db.collection("activities").add({ userId: user.dbId, type: 'event', status: 'approved', title: `Evento: ${eventData.nomeEvento}`, points: 30, date: new Date().toISOString() });
-                showMsg(`30 pontos adicionados para ${user.nome}!`);
-                setEventData({cpf:'', nomeEvento:''});
+                
+                db.collection("activities").add({ 
+                    userId: user.dbId, type: 'event', status: 'approved', 
+                    title: `Evento: ${eventData.nomeEvento}`, points: 30, date: new Date().toISOString() 
+                }).then(() => {
+                    showMsg(`30 pontos adicionados para ${user.nome}!`);
+                    setEventData({cpf:'', nomeEvento:''});
+                });
             };
 
-            const executeDeleteUser = async () => {
+            const executeDeleteUser = () => {
                 if(deleteConfirm) {
-                    await db.collection("users").doc(deleteConfirm).delete();
-                    showMsg("Leitor excluído com sucesso.");
-                    setDeleteConfirm(null);
+                    db.collection("users").doc(deleteConfirm).delete().then(() => {
+                        showMsg("Leitor excluído com sucesso.");
+                        setDeleteConfirm(null);
+                    });
                 }
             };
 
             const handleExportExcel = () => {
+                if (typeof XLSX === 'undefined') {
+                    showMsg("Ferramenta de Excel carregando, tente de novo.", "error");
+                    return;
+                }
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ranking.map(u => ({ Nome: u.nome, Registro: u.registro, Idade: u.idade, Contato: u.telefone, Pontos: u.points }))), "Leitores");
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(activities.filter(a=>a.type==='book').map(b => {
@@ -801,61 +908,61 @@
                 <div className="min-h-screen bg-gray-50 pb-20">
                     <header className="bg-gray-900 text-white p-4 shadow-lg sticky top-0 z-50">
                         <div className="max-w-6xl mx-auto flex justify-between items-center">
-                            <div><h1 className="font-black text-xl">Painel Admin</h1><p className="text-xs text-gray-400">Biblioteca Délio Ledoux</p></div>
-                            <button onClick={() => setView('login')} className="text-sm font-bold bg-red-600 px-4 py-2 rounded-lg hover:bg-red-700 transition">Sair</button>
+                            <div><h1 className="font-black text-2xl">Painel Admin</h1><p className="text-sm text-gray-400 font-bold">Biblioteca Délio Ledoux</p></div>
+                            <button onClick={() => setView('login')} className="text-sm font-black bg-red-600 px-6 py-3 rounded-xl hover:bg-red-700 transition shadow-md text-lg">Sair do Sistema</button>
                         </div>
                     </header>
 
                     {deleteConfirm && (
                         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[100] p-4">
-                            <div className="bg-white p-8 rounded-3xl max-w-md w-full text-center shadow-2xl">
-                                <i className="fas fa-exclamation-triangle text-red-500 text-5xl mb-4"></i>
-                                <h3 className="text-xl font-black mb-2">Excluir Leitor?</h3>
-                                <p className="text-gray-600 mb-6 font-bold">Esta ação não pode ser desfeita e os pontos serão perdidos.</p>
+                            <div className="bg-white p-8 rounded-3xl max-w-md w-full text-center shadow-2xl border-t-8 border-red-500">
+                                <i className="fas fa-exclamation-triangle text-red-500 text-6xl mb-4"></i>
+                                <h3 className="text-2xl font-black mb-2">Excluir Leitor?</h3>
+                                <p className="text-gray-600 mb-6 font-bold text-lg">Esta ação não pode ser desfeita e os pontos serão perdidos.</p>
                                 <div className="flex gap-4">
-                                    <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-3 bg-gray-200 text-gray-700 font-bold rounded-xl">Cancelar</button>
-                                    <button onClick={executeDeleteUser} className="flex-1 py-3 bg-red-600 text-white font-black rounded-xl hover:bg-red-700">Sim, Excluir</button>
+                                    <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-4 bg-gray-200 text-gray-700 font-black text-lg rounded-xl">Cancelar</button>
+                                    <button onClick={executeDeleteUser} className="flex-1 py-4 bg-red-600 text-white font-black text-lg rounded-xl hover:bg-red-700 shadow-md">Sim, Excluir</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
                     <main className="max-w-6xl mx-auto mt-6 px-4">
-                        <div className="flex flex-wrap bg-white rounded-xl shadow-sm mb-6 overflow-hidden border">
-                            <button onClick={()=>setTab('resumos')} className={`flex-1 min-w-[120px] py-3 px-2 font-bold text-sm ${tab==='resumos' ? 'bg-brand-blue text-white':'text-gray-600 hover:bg-gray-50'}`}>Resumos Agendados</button>
-                            <button onClick={()=>setTab('status')} className={`flex-1 min-w-[120px] py-3 px-2 font-bold text-sm border-l ${tab==='status' ? 'bg-brand-blue text-white':'text-gray-600 hover:bg-gray-50'}`}>Status Leituras</button>
-                            <button onClick={()=>setTab('eventos')} className={`flex-1 min-w-[120px] py-3 px-2 font-bold text-sm border-l ${tab==='eventos' ? 'bg-brand-blue text-white':'text-gray-600 hover:bg-gray-50'}`}>Eventos</button>
-                            <button onClick={()=>setTab('leitores')} className={`flex-1 min-w-[120px] py-3 px-2 font-bold text-sm border-l ${tab==='leitores' ? 'bg-brand-blue text-white':'text-gray-600 hover:bg-gray-50'}`}>Leitores / Excel</button>
-                            <button onClick={()=>setTab('ranking')} className={`flex-1 min-w-[120px] py-3 px-2 font-bold text-sm border-l ${tab==='ranking' ? 'bg-brand-blue text-white':'text-gray-600 hover:bg-gray-50'}`}>Ranking</button>
+                        <div className="flex flex-wrap bg-white rounded-xl shadow-sm mb-6 overflow-hidden border border-gray-200">
+                            <button onClick={()=>setTab('resumos')} className={`flex-1 min-w-[120px] py-4 px-2 font-black text-sm ${tab==='resumos' ? 'bg-brand-blue text-white shadow-inner':'text-gray-600 hover:bg-gray-50'}`}>Resumos Agendados</button>
+                            <button onClick={()=>setTab('status')} className={`flex-1 min-w-[120px] py-4 px-2 font-black text-sm border-l ${tab==='status' ? 'bg-brand-blue text-white shadow-inner':'text-gray-600 hover:bg-gray-50'}`}>Status Leituras</button>
+                            <button onClick={()=>setTab('eventos')} className={`flex-1 min-w-[120px] py-4 px-2 font-black text-sm border-l ${tab==='eventos' ? 'bg-brand-blue text-white shadow-inner':'text-gray-600 hover:bg-gray-50'}`}>Eventos</button>
+                            <button onClick={()=>setTab('leitores')} className={`flex-1 min-w-[120px] py-4 px-2 font-black text-sm border-l ${tab==='leitores' ? 'bg-brand-blue text-white shadow-inner':'text-gray-600 hover:bg-gray-50'}`}>Leitores / Excel</button>
+                            <button onClick={()=>setTab('ranking')} className={`flex-1 min-w-[120px] py-4 px-2 font-black text-sm border-l ${tab==='ranking' ? 'bg-brand-blue text-white shadow-inner':'text-gray-600 hover:bg-gray-50'}`}>Ranking</button>
                         </div>
 
-                        {msg.text && <div className={`p-4 rounded-xl font-bold mb-6 text-center shadow-sm border ${msg.type === 'error' ? 'bg-red-100 text-red-800 border-red-200' : 'bg-green-100 text-green-800 border-green-200'}`}>{msg.text}</div>}
+                        {msg.text && <div className={`p-4 rounded-xl font-black mb-6 text-center shadow-sm border text-lg ${msg.type === 'error' ? 'bg-red-100 text-red-800 border-red-300' : 'bg-green-100 text-green-800 border-green-300'}`}>{msg.text}</div>}
 
-                        <div className="bg-white rounded-3xl shadow-sm p-6 border">
+                        <div className="bg-white rounded-3xl shadow-sm p-6 border border-gray-200">
                             {tab === 'resumos' && (
                                 <div>
                                     <h2 className="text-2xl font-black text-brand-blue mb-6">Aprovar Entregas de Resumo</h2>
                                     {(() => {
-                                        const pendingSummaries = activities.filter(a => a.status === 'Agendado' || (a.type === 'summary' && a.status === 'pending'));
+                                        const pendingSummaries = activities.filter(a => a.status === 'Agendado' || (a.type === 'summary' && a.status === 'pending') || (a.type === 'book' && a.status === 'pending'));
                                         
-                                        if (pendingSummaries.length === 0) return <p className="text-gray-500 font-bold p-8 text-center bg-gray-50 rounded-xl border-2 border-dashed">Nenhum agendamento pendente.</p>;
+                                        if (pendingSummaries.length === 0) return <p className="text-gray-500 font-bold p-10 text-center bg-gray-50 rounded-xl border-2 border-dashed text-lg">Nenhum agendamento pendente.</p>;
                                         
                                         return pendingSummaries.map(act => {
                                             const u = users.find(usr => usr.dbId === act.userId);
                                             const dateStr = act.scheduleDate || act.date || 'Sem data definida';
-                                            const timeStr = act.scheduleTime || act.time || 'Sem horário definido';
+                                            const timeStr = act.scheduleTime || act.time || 'Sem horário';
                                             
                                             return (
                                                 <div key={act.dbId} className="flex flex-col sm:flex-row justify-between sm:items-center p-6 border-2 rounded-xl mb-4 bg-orange-50 border-orange-200 shadow-sm gap-4">
                                                     <div>
-                                                        <p className="font-black text-xl text-gray-800">{u ? u.nome : 'Leitor Excluído'} <span className="text-sm text-gray-500 font-bold">({u ? u.registro : '---'})</span></p>
-                                                        <p className="font-bold text-gray-700 mt-1"><i className="fas fa-book text-orange-500 mr-2"></i> {act.type === 'summary' ? 'Atividade: Resumo' : `Livro: ${act.title}`}</p>
-                                                        <p className="text-sm font-black text-orange-800 mt-3 bg-orange-200 inline-block px-4 py-2 rounded-lg shadow-sm">
-                                                            <i className="fas fa-calendar-alt mr-2"></i> AGENDADO PARA: {dateStr} às {timeStr}
+                                                        <p className="font-black text-xl text-gray-800">{u ? u.nome : 'Leitor Excluído'} <span className="text-sm text-gray-500 font-bold bg-white px-2 py-1 rounded shadow-sm ml-2">{u ? u.registro : '---'}</span></p>
+                                                        <p className="font-bold text-gray-700 mt-2 text-lg"><i className="fas fa-book text-orange-500 mr-2"></i> {act.type === 'summary' ? 'Atividade: Resumo' : `Livro: ${act.title}`}</p>
+                                                        <p className="text-sm font-black text-orange-900 mt-3 bg-orange-200 inline-block px-4 py-2 rounded-lg shadow-sm border border-orange-300">
+                                                            <i className="fas fa-calendar-alt mr-2"></i> AGENDADO: {dateStr} às {timeStr}
                                                         </p>
                                                     </div>
-                                                    <button onClick={() => handleApproveSummary(act)} className="bg-green-600 text-white font-black py-4 px-8 rounded-xl hover:bg-green-700 shadow-md transform active:scale-95 text-lg w-full sm:w-auto">
-                                                        CONFIRMAR PRESENÇA E APROVAR (+50 pts)
+                                                    <button onClick={() => handleApproveSummary(act)} className="bg-green-600 text-white font-black py-4 px-8 rounded-xl hover:bg-green-700 shadow-lg transform active:scale-95 text-lg w-full sm:w-auto">
+                                                        <i className="fas fa-check-circle mr-2"></i> APROVAR (+50 pts)
                                                     </button>
                                                 </div>
                                             )
@@ -867,30 +974,30 @@
                             {tab === 'status' && (
                                 <div>
                                     <h2 className="text-2xl font-black text-brand-blue mb-6">Gestão Completa de Leituras</h2>
-                                    <div className="overflow-x-auto rounded-xl border border-gray-200">
+                                    <div className="overflow-x-auto rounded-xl border-2 border-gray-200 shadow-sm">
                                         <table className="w-full text-left border-collapse bg-white">
                                             <thead>
-                                                <tr className="bg-gray-100 border-b">
-                                                    <th className="p-4 font-black text-gray-600">Leitor</th>
-                                                    <th className="p-4 font-black text-gray-600">Livro</th>
-                                                    <th className="p-4 font-black text-gray-600">Status no Sistema</th>
+                                                <tr className="bg-gray-100 border-b-2">
+                                                    <th className="p-4 font-black text-gray-700 text-lg">Leitor</th>
+                                                    <th className="p-4 font-black text-gray-700 text-lg">Livro</th>
+                                                    <th className="p-4 font-black text-gray-700 text-lg">Status no Sistema</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {activities.filter(a => a.type === 'book').length === 0 ? 
-                                                    <tr><td colSpan="3" className="p-8 text-center text-gray-500 font-bold">Nenhuma leitura registrada.</td></tr> :
+                                                    <tr><td colSpan="3" className="p-8 text-center text-gray-500 font-bold text-lg">Nenhuma leitura registrada.</td></tr> :
                                                     activities.filter(a => a.type === 'book').map(book => {
                                                     const u = users.find(usr => usr.dbId === book.userId);
                                                     return (
                                                         <tr key={book.dbId} className="border-b hover:bg-gray-50 transition">
-                                                            <td className="p-4 font-bold text-gray-800">{u ? u.nome : 'Excluído'} <br/><span className="text-xs text-gray-500">{u ? u.registro : '---'}</span></td>
-                                                            <td className="p-4 font-bold text-gray-700">{book.title}</td>
+                                                            <td className="p-4 font-black text-gray-800">{u ? u.nome : 'Excluído'} <br/><span className="text-sm font-bold text-gray-500 bg-gray-200 px-2 rounded mt-1 inline-block">{u ? u.registro : '---'}</span></td>
+                                                            <td className="p-4 font-bold text-gray-700 text-lg">{book.title}</td>
                                                             <td className="p-4 font-black">
-                                                                <span className={`px-4 py-1 rounded-full text-xs uppercase border ${
-                                                                    book.status === 'Lendo' || book.status === 'pending' ? 'bg-gray-100 text-gray-600 border-gray-300' :
-                                                                    book.status === 'Lido' ? 'bg-blue-100 text-blue-700 border-blue-300' :
-                                                                    book.status === 'Agendado' ? 'bg-orange-100 text-orange-700 border-orange-300' :
-                                                                    book.status === 'Resumo Aprovado' || book.status === 'approved' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-gray-100'
+                                                                <span className={`px-4 py-2 rounded-lg text-sm uppercase border shadow-sm ${
+                                                                    book.status === 'Lendo' || book.status === 'pending' ? 'bg-gray-100 text-gray-700 border-gray-300' :
+                                                                    book.status === 'Lido' ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                                                                    book.status === 'Agendado' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                                                                    book.status === 'Resumo Aprovado' || book.status === 'approved' ? 'bg-green-100 text-green-800 border-green-400' : 'bg-gray-100'
                                                                 }`}>
                                                                     {tStatus(book.status)}
                                                                 </span>
@@ -906,12 +1013,12 @@
 
                             {tab === 'eventos' && (
                                 <div className="max-w-md">
-                                    <h2 className="text-2xl font-black text-brand-blue mb-6">Check-in de Evento</h2>
-                                    <p className="text-gray-600 font-bold mb-4">Adiciona 30 pontos ao leitor por participação.</p>
+                                    <h2 className="text-2xl font-black text-brand-blue mb-4">Check-in de Evento</h2>
+                                    <p className="text-gray-600 font-bold mb-6 text-lg">Adiciona 30 pontos ao leitor por participação.</p>
                                     <form onSubmit={handleRegisterEvent} className="space-y-4">
-                                        <input type="text" placeholder="CPF ou Registro do Leitor" required value={eventData.cpf} onChange={e=>setEventData({...eventData, cpf: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-gray-50 font-bold outline-none focus:border-brand-blue" />
-                                        <input type="text" placeholder="Nome do Evento (ex: Roda de Leitura)" required value={eventData.nomeEvento} onChange={e=>setEventData({...eventData, nomeEvento: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-gray-50 font-bold outline-none focus:border-brand-blue" />
-                                        <button type="submit" className="w-full bg-brand-blue text-white font-black text-lg py-4 rounded-xl shadow-md hover:bg-opacity-90">LANÇAR 30 PONTOS</button>
+                                        <input type="text" placeholder="CPF ou Registro do Leitor" required value={eventData.cpf} onChange={e=>setEventData({...eventData, cpf: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-gray-50 font-bold outline-none focus:border-brand-blue text-lg" />
+                                        <input type="text" placeholder="Nome do Evento (ex: Roda de Leitura)" required value={eventData.nomeEvento} onChange={e=>setEventData({...eventData, nomeEvento: e.target.value})} className="w-full p-4 border-2 rounded-xl bg-gray-50 font-bold outline-none focus:border-brand-blue text-lg" />
+                                        <button type="submit" className="w-full bg-brand-blue text-white font-black text-xl py-5 rounded-xl shadow-lg hover:bg-opacity-90 transform active:scale-95">LANÇAR 30 PONTOS</button>
                                     </form>
                                 </div>
                             )}
@@ -920,26 +1027,26 @@
                                 <div>
                                     <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
                                         <h2 className="text-2xl font-black text-brand-blue">Controle de Leitores</h2>
-                                        <button onClick={handleExportExcel} className="bg-green-600 text-white font-black px-6 py-3 rounded-xl shadow-md hover:bg-green-700 flex items-center justify-center"><i className="fas fa-file-excel mr-2"></i> Exportar Banco (.xlsx)</button>
+                                        <button onClick={handleExportExcel} className="bg-green-600 text-white font-black px-8 py-4 rounded-xl shadow-lg hover:bg-green-700 flex items-center justify-center transform active:scale-95 text-lg"><i className="fas fa-file-excel mr-2 text-2xl"></i> Exportar Banco (.xlsx)</button>
                                     </div>
-                                    <div className="overflow-x-auto rounded-xl border border-gray-200">
+                                    <div className="overflow-x-auto rounded-xl border-2 border-gray-200 shadow-sm">
                                         <table className="w-full text-left border-collapse bg-white">
                                             <thead>
-                                                <tr className="bg-gray-100 border-b">
-                                                    <th className="p-4 font-black text-gray-600">Foto</th>
-                                                    <th className="p-4 font-black text-gray-600">Leitor / Contato</th>
-                                                    <th className="p-4 font-black text-gray-600">Responsável</th>
-                                                    <th className="p-4 font-black text-gray-600">Ações</th>
+                                                <tr className="bg-gray-100 border-b-2">
+                                                    <th className="p-4 font-black text-gray-700">Foto</th>
+                                                    <th className="p-4 font-black text-gray-700">Leitor / Contato</th>
+                                                    <th className="p-4 font-black text-gray-700">Responsável</th>
+                                                    <th className="p-4 font-black text-gray-700">Ações</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {users.map(u => (
                                                     <tr key={u.dbId} className="border-b hover:bg-gray-50">
-                                                        <td className="p-4"><img src={u.foto} className="w-12 h-12 rounded-full object-cover border-2 border-brand-blue"/></td>
-                                                        <td className="p-4"><p className="font-bold text-gray-800">{u.nome}</p><p className="text-xs text-gray-500 font-bold mt-1 bg-gray-200 inline-block px-2 rounded">{u.registro} | {u.telefone}</p></td>
-                                                        <td className="p-4 text-xs font-bold text-gray-600">{u.respNome ? `${u.respNome} (${u.respTel})` : 'Maior de Idade'}</td>
+                                                        <td className="p-4"><img src={u.foto} className="w-14 h-14 rounded-full object-cover border-2 border-brand-blue shadow-sm"/></td>
+                                                        <td className="p-4"><p className="font-black text-gray-800 text-lg">{u.nome}</p><p className="text-sm text-gray-600 font-bold mt-1 bg-gray-200 inline-block px-2 py-1 rounded shadow-inner">{u.registro} | {u.telefone}</p></td>
+                                                        <td className="p-4 text-sm font-bold text-gray-600">{u.respNome ? `${u.respNome} (${u.respTel})` : 'Maior de Idade'}</td>
                                                         <td className="p-4">
-                                                            <button onClick={() => setDeleteConfirm(u.dbId)} className="bg-red-100 text-red-600 font-black px-4 py-2 rounded-lg hover:bg-red-200 text-xs shadow-sm"><i className="fas fa-trash-alt mr-1"></i> Excluir</button>
+                                                            <button onClick={() => setDeleteConfirm(u.dbId)} className="bg-red-100 text-red-700 font-black px-4 py-3 rounded-lg hover:bg-red-200 text-sm shadow-sm border border-red-200"><i className="fas fa-trash-alt mr-1"></i> Excluir</button>
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -952,16 +1059,16 @@
                             {tab === 'ranking' && (
                                 <div>
                                     <h2 className="text-2xl font-black text-brand-blue mb-6">Ranking Geral Oficial</h2>
-                                    <div className="space-y-3">
-                                        {ranking.length === 0 ? <p className="text-gray-500 font-bold p-6">Nenhum leitor registrado ainda.</p> :
+                                    <div className="space-y-4">
+                                        {ranking.length === 0 ? <p className="text-gray-500 font-bold p-8 text-center text-lg">Nenhum leitor registrado ainda.</p> :
                                          ranking.map((u, i) => (
-                                            <div key={u.dbId} className={`flex justify-between items-center p-4 border-2 rounded-xl shadow-sm ${i===0?'bg-yellow-50 border-yellow-300':i===1?'bg-gray-50 border-gray-300':i===2?'bg-orange-50 border-orange-200':'bg-white'}`}>
-                                                <div className="flex items-center gap-4">
-                                                    <span className={`text-3xl font-black w-10 text-center ${i===0?'text-yellow-500':i===1?'text-gray-400':i===2?'text-orange-500':'text-gray-400'}`}>{i+1}º</span>
-                                                    <img src={u.foto} className="w-14 h-14 rounded-full object-cover border-4 border-white shadow-sm"/>
-                                                    <div><p className="font-bold text-gray-800 text-lg">{u.nome}</p><p className="text-xs text-gray-500 font-bold">{u.registro}</p></div>
+                                            <div key={u.dbId} className={`flex justify-between items-center p-5 border-2 rounded-xl shadow-sm ${i===0?'bg-yellow-50 border-yellow-400':i===1?'bg-gray-50 border-gray-300':i===2?'bg-orange-50 border-orange-300':'bg-white'}`}>
+                                                <div className="flex items-center gap-5">
+                                                    <span className={`text-4xl font-black w-12 text-center ${i===0?'text-yellow-500':i===1?'text-gray-400':i===2?'text-orange-500':'text-gray-400'}`}>{i+1}º</span>
+                                                    <img src={u.foto} className="w-16 h-16 rounded-full object-cover border-4 border-white shadow-md"/>
+                                                    <div><p className="font-black text-gray-800 text-xl">{u.nome}</p><p className="text-sm text-gray-600 font-bold">{u.registro}</p></div>
                                                 </div>
-                                                <div className="font-black text-2xl text-brand-blue bg-blue-50 px-4 py-2 rounded-xl border border-blue-100">{u.points} pts</div>
+                                                <div className="font-black text-3xl text-brand-blue bg-blue-50 px-6 py-3 rounded-xl border-2 border-blue-200 shadow-inner">{u.points} pts</div>
                                             </div>
                                         ))}
                                     </div>
